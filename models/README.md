@@ -22,6 +22,8 @@ them, or `FORCE=1` to replace existing files.
 
 ## Runtime files
 
+These three files are required for the complete visual defense demo:
+
 - `nnue-halfkp-demo.bin` - compact deterministic HalfKP/NNUE float model used
   by the C++ visualizer. This is the file loaded by `model.nnue`.
 - `lc0-cnn-112p-10x128-policy4672-wdl3.bin` - small LC0-style CNN ResNet file
@@ -30,6 +32,10 @@ them, or `FORCE=1` to replace existing files.
 - `lc0-bt4-1024x15x32h-visual.bin` - BT4 visual-model metadata consumed by
   the native deterministic token-transformer path. This is loaded by
   `model.lc0_bt4` and validates the BT4 dimensions used by this build.
+
+Run `./scripts/demo_check.sh` before the final demo to confirm that the local
+ignored model files and tutorial evidence are present on the presentation
+machine.
 
 ## Optional reference blobs
 

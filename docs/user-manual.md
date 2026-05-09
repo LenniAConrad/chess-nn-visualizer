@@ -19,11 +19,14 @@ Build and run from the repository root:
 
 ```sh
 ./scripts/build.sh
-./build/cnnv
+./scripts/run.sh
 ```
 
-The default window is 1280x800. The app reads `config.ini` at startup for
-window, font, model, default FEN, and clock settings.
+The default submitted configuration starts in a fullscreen window with the
+activation panel set to OFF. The `window.width` and `window.height` values are
+used as the windowed fallback if fullscreen is disabled. The app reads
+`config.ini` at startup for window, font, model, default FEN, and clock
+settings.
 
 Before a model demo, populate local weight files:
 
@@ -35,6 +38,15 @@ The full visual tutorial is available as [`tutorial.gif`](tutorial.gif), with a
 higher-resolution video copy at [`demo.mp4`](demo.mp4). It walks through the
 main command buttons, architecture selectors, abstract/detailed activation
 views, setup editor, FEN tools, and native search preview.
+
+Before the final defense, run:
+
+```sh
+./scripts/demo_check.sh
+```
+
+This verifies the required documents, tutorial media, local model files,
+fullscreen/OFF startup configuration, media metadata, and automated tests.
 
 ## 3. Playing a game
 

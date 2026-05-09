@@ -84,11 +84,25 @@ available. Runtime model paths use a consistent `.bin` naming scheme:
 `lc0-bt4-1024x15x32h-visual.bin`. Optional upstream reference blobs are also
 stored with `-reference.bin` names when imported.
 
+For the full defense demo, these runtime files should exist before launching:
+`models/nnue-halfkp-demo.bin`,
+`models/lc0-cnn-112p-10x128-policy4672-wdl3.bin`, and
+`models/lc0-bt4-1024x15x32h-visual.bin`.
+
 ## Test
 
 ```bash
 ./scripts/test.sh
 ```
+
+Before the final defense, run the complete readiness check:
+
+```bash
+./scripts/demo_check.sh
+```
+
+It verifies the required documents, tutorial media, local model files,
+fullscreen/OFF startup config, media metadata, and automated tests.
 
 ## API Documentation
 

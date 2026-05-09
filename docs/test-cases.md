@@ -16,7 +16,7 @@ Latest automated run:
 Date: 2026-05-09
 Result: PASS
 ctest: 1/1 test passed, 0 failed
-Total test time: 3.20 seconds
+Total test time: 0.06 seconds
 ```
 
 Coverage:
@@ -146,3 +146,16 @@ The demo walkthrough shows:
    move, castling rights, en-passant, halfmove/fullmove counters, Validate,
    Apply, and Cancel.
 9. Edit FEN flow with validation and applying a custom legal position.
+
+## 4. Final defense readiness check
+
+Command:
+
+```sh
+./scripts/demo_check.sh
+```
+
+Expected result: the script reports that all required PDFs, tutorial media,
+runtime model files, fullscreen/OFF startup settings, media metadata, and
+automated tests are present. If a model file is missing, run
+`./scripts/import_models.sh` and re-run the check before the live demo.
