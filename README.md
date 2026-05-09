@@ -39,10 +39,9 @@ live depth, nodes, evaluation, and PV. The full-resolution MP4 version is
 ## Build
 
 Requirements: a C++17 compiler, CMake ≥ 3.20, and the system libraries
-raylib needs (X11 / OpenGL on Linux). CUDA is optional; when `nvcc` is
-available the build includes GPU tensor kernels for larger `matmul` and
-`conv2d` calls, and the runtime falls back to CPU if no usable CUDA
-device/driver is present. Disable it with `-DCNNV_ENABLE_CUDA=OFF`.
+raylib needs (X11 / OpenGL on Linux). The helper scripts default to a CPU
+build for reliability; set `CNNV_ENABLE_CUDA=ON` when running the scripts if
+you want optional CUDA tensor kernels.
 On Debian/Ubuntu:
 
 ```bash
@@ -54,12 +53,18 @@ Then:
 
 ```bash
 ./scripts/build.sh
+./scripts/run.sh
 ```
+
+`scripts/build.sh` automatically uses `~/.local/src/raylib` when that local
+raylib checkout exists. To use a different local raylib source instead, set
+`RAYLIB_SOURCE_DIR=/path/to/raylib`. Without a local source, CMake falls back
+to fetching raylib through `FetchContent`.
 
 Or manually:
 
 ```bash
-cmake -B build
+cmake -B build -DCNNV_ENABLE_CUDA=OFF
 cmake --build build -j
 ./build/cnnv
 ```
