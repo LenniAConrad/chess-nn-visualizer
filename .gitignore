@@ -1,0 +1,55 @@
+# Build directories and CMake output
+/build/
+/out/
+/cmake-build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/CMakeUserPresets.json
+/CTestTestfile.cmake
+/Testing/
+/CPackConfig.cmake
+/CPackSourceConfig.cmake
+/Makefile
+/cmake_install.cmake
+/compile_commands.json
+
+# Compiled artifacts
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.lib
+*.pdb
+*.ilk
+
+# Neural-network model blobs are large/local runtime inputs.
+# Keep models/README.md and models/.gitkeep tracked.
+/models/*.bin
+
+# Runtime saves, logs, and local experiments
+/position.fen
+/session/
+*.log
+*.tmp
+*.temp
+
+# Generated documentation folders from Doxygen or LaTeX builds
+/docs/html/
+/docs/latex/
+
+# Local editor, OS, and assistant/tool state
+/.cache/
+/.vscode/
+/.idea/
+/.agents/
+/.claude/
+/.codex/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.user

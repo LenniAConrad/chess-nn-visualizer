@@ -1,0 +1,39 @@
+# Doxygen configuration for cpp-nn-visualizer.
+# Run `doxygen Doxyfile` from the repository root, or use the optional
+# `docs` CMake target when Doxygen is installed.
+
+PROJECT_NAME           = "cpp-nn-visualizer"
+PROJECT_BRIEF          = "Native C++ chess neural-network activation visualizer"
+OUTPUT_DIRECTORY       = build/docs/doxygen
+
+INPUT                  = README.md src docs
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.cpp *.cu *.md
+USE_MDFILE_AS_MAINPAGE = README.md
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = NO
+MULTILINE_CPP_IS_BRIEF = NO
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+CALL_GRAPH             = NO
+CALLER_GRAPH           = NO
+
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO
+
+EXCLUDE_PATTERNS       = */build/* */.git/* */session/*

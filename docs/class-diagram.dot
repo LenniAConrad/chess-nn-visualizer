@@ -1,0 +1,92 @@
+digraph CppNnVisualizer {
+  graph [rankdir=LR, splines=polyline, nodesep=0.55, ranksep=0.9, fontname="DejaVu Sans"];
+  node [shape=record, fontname="DejaVu Sans", fontsize=10];
+  edge [fontname="DejaVu Sans", fontsize=9];
+
+  subgraph cluster_chess {
+    label="chess";
+    color="#9aa6b2";
+
+    Piece [label="{Piece|+ color : Color\l+ type : PieceType\l|+ isNone() : bool\l}"];
+    Move [label="{Move|- m_value : uint16_t\l|+ from() : Square\l+ to() : Square\l+ promotion() : Promotion\l+ toUci() : string\l}"];
+    MoveList [label="{MoveList|- m_moves[256] : Move\l- m_size : size_t\l|+ push(Move)\l+ clear()\l+ size() : size_t\l}"];
+    StateInfo [label="{StateInfo|+ capturedPiece : Piece\l+ prevCastlingRights : uint8_t\l+ prevEpSquare : Square\l+ prevHalfmoveClock : int\l+ moveMade : Move\l}"];
+    Position [label="{Position|- m_pieces[2][6]\l- m_byColor[2]\l- m_occupied : Bitboard\l- m_board[64] : Piece\l- m_history : vector of StateInfo\l|+ make(Move)\l+ unmake()\l+ inCheck() : bool\l+ hash() : uint64_t\l}"];
+    Fen [label="{Fen|utility|+ parse(string) : optional Position\l+ format(Position) : string\l}"];
+    MoveGenerator [label="{MoveGenerator|utility|+ generateLegal(Position&, MoveList&)\l}"];
+    PositionEditor [label="{PositionEditor|- m_position : Position\l|+ placePiece(Square, Piece)\l+ build() : Position\l+ fen() : string\l}"];
+  }
+
+  subgraph cluster_game {
+    label="game";
+    color="#9aa6b2";
+
+    MoveRecord [label="{MoveRecord|+ move : Move\l+ fenBefore : string\l+ fenAfter : string\l+ san : string\l+ prev : MoveRecord*\l+ next : MoveRecord*\l}"];
+    MoveHistory [label="{MoveHistory|- m_head : MoveRecord*\l- m_current : MoveRecord*\l|+ pushMove(MoveRecord)\l+ undo() : MoveRecord*\l+ redo() : MoveRecord*\l}"];
+    Game [label="{Game|- m_position : Position\l- m_history : MoveHistory\l|+ tryMove(Move) : bool\l+ undo() : bool\l+ redo() : bool\l+ status() : GameStatus\l}"];
+  }
+
+  subgraph cluster_nn {
+    label="nn";
+    color="#9aa6b2";
+
+    Tensor [label="{Tensor T Rank|- m_data : vector of T\l- m_shape : array size_t Rank\l- m_strides : array size_t Rank\l|+ reshape(Shape)\l+ at(...) : T&\l+ data() : T*\l}"];
+    ActivationSnapshot [label="{ActivationSnapshot|- m_entries : unordered_map string Entry\l|+ allocate(key, shape) : float*\l+ store(key, shape, data)\l+ find(key) : Entry*\l}"];
+    INetwork [label="{INetwork|abstract|+ load(path)\l+ evaluate(Position, Snapshot)\l+ name() : string\l}"];
+    NnueNetwork [label="{nnue::Network|- m_weights : Weights\l|+ load(path)\l+ evaluate(pos, out)\l}"];
+    CnnNetwork [label="{lc0_cnn::Network|- m_weights : Weights\l|+ load(path)\l+ evaluate(pos, out)\l}"];
+    Bt4Network [label="{lc0_bt4::Network|constants: tokens, blocks, heads\l|+ load(path)\l+ evaluate(pos, out)\l}"];
+  }
+
+  subgraph cluster_io {
+    label="io";
+    color="#9aa6b2";
+
+    Config [label="{Config|- m_values : map string string\l|+ load(path) : bool\l+ save(path) : bool\l+ getString(key, fallback)\l}"];
+    WeightFileReader [label="{WeightFileReader|- m_stream : ifstream\l- m_path : string\l- m_size : size_t\l|+ open(path, magic)\l+ read_f32_array(dst, count)\l+ seek(offset)\l}"];
+  }
+
+  subgraph cluster_viz {
+    label="viz";
+    color="#9aa6b2";
+
+    App [label="{App|- m_game : Game\l- m_config : Config\l- m_nnue/m_cnn/m_bt4\l- m_board : BoardView\l|+ run() : int\l- handleInput()\l- render()\l- evaluateIfStale()\l}"];
+    BoardView [label="{BoardView|- m_position : Position*\l- m_bounds : Rectangle\l|+ draw(theme)\l+ squareAtPixel(pixel)\l+ setActivationOverlay(values)\l}"];
+    IActivationView [label="{IActivationView|abstract|+ update(snapshot)\l+ setBounds(rect)\l+ draw(theme)\l+ name() : string\l}"];
+    NnueView [label="{NnueView|draws NNUE activations\l}"];
+    CnnView [label="{CnnView|draws CNN activations\l}"];
+    Bt4View [label="{Bt4View|draws BT4 activations\l}"];
+  }
+
+  Position -> Piece [label="contains"];
+  Position -> StateInfo [label="history"];
+  MoveList -> Move [label="array"];
+  Fen -> Position [style=dashed, label="parse/format"];
+  MoveGenerator -> Position [style=dashed, label="uses"];
+  MoveGenerator -> MoveList [style=dashed, label="fills"];
+  PositionEditor -> Position [label="wraps"];
+
+  Game -> Position [label="owns"];
+  Game -> MoveHistory [label="owns"];
+  MoveHistory -> MoveRecord [label="linked nodes"];
+  MoveRecord -> Move [label="stores"];
+
+  INetwork -> NnueNetwork [arrowhead=empty, label="implemented by"];
+  INetwork -> CnnNetwork [arrowhead=empty, label="implemented by"];
+  INetwork -> Bt4Network [arrowhead=empty, label="implemented by"];
+  NnueNetwork -> ActivationSnapshot [style=dashed, label="stores"];
+  CnnNetwork -> ActivationSnapshot [style=dashed, label="stores"];
+  Bt4Network -> ActivationSnapshot [style=dashed, label="stores"];
+
+  App -> Game [label="owns"];
+  App -> Config [label="owns"];
+  App -> BoardView [label="owns"];
+  App -> INetwork [style=dashed, label="evaluates"];
+  App -> IActivationView [style=dashed, label="updates"];
+  IActivationView -> NnueView [arrowhead=empty];
+  IActivationView -> CnnView [arrowhead=empty];
+  IActivationView -> Bt4View [arrowhead=empty];
+  BoardView -> Position [style=dashed, label="reads"];
+  WeightFileReader -> NnueNetwork [style=dashed, label="loads"];
+  WeightFileReader -> CnnNetwork [style=dashed, label="loads"];
+}
