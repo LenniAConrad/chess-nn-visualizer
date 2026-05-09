@@ -2,7 +2,7 @@
 
 /**
  * @file PieceSprites.h
- * @brief raylib texture owner for chess piece SVG sprites.
+ * @brief raylib texture owner for chess piece PNG/SVG sprites.
  */
 
 #include "chess/Piece.h"

@@ -52,8 +52,8 @@ set(SUPPORT_MODULE_RSHAPES ON CACHE BOOL "" FORCE)
 set(SUPPORT_MODULE_RTEXT   ON CACHE BOOL "" FORCE)
 set(SUPPORT_MODULE_RTEXTURES ON CACHE BOOL "" FORCE)
 set(SUPPORT_MODULE_RAUDIO OFF CACHE BOOL "" FORCE)
-# Image format support. PNG is on by default; SVG must be opted in because
-# the piece sprites in assets/pieces are SVG (rasterised at load time).
+# Image format support. PNG sprites are committed for portability; SVG source
+# assets are kept beside them for editing and for raylib builds with SVG on.
 set(SUPPORT_FILEFORMAT_PNG ON CACHE BOOL "" FORCE)
 set(SUPPORT_FILEFORMAT_SVG ON CACHE BOOL "" FORCE)
 FetchContent_Declare(

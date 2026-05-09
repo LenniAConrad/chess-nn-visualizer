@@ -60,7 +60,7 @@ and CNN forward-pass behavior.
 
 Date: 2026-05-08
 
-Environment: Linux/X11, default 1280x800 application window.
+Environment: Linux/X11, default fullscreen application window.
 
 Kiwipete FEN used:
 
@@ -92,7 +92,7 @@ r3k2r/p1ppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
 
 Date: 2026-05-08
 
-Environment: Linux/X11, default 1280x800 application window.
+Environment: Linux/X11, default fullscreen application window.
 
 Result: PASS
 
@@ -107,7 +107,7 @@ Result: PASS
 
 Date: 2026-05-09
 
-Environment: Linux/X11, default 1280x800 application window.
+Environment: Linux/X11, default fullscreen application window.
 
 Result: PASS when all three architecture buttons can be selected without
 changing the legal chess position.
@@ -115,7 +115,7 @@ changing the legal chess position.
 | Step | Action | Expected result |
 | --- | --- | --- |
 | 1 | Start the app and play at least one legal move. | Board, move history, and status update. |
-| 2 | Select NNUE or launch with `startup.arch=nnue`, then use abstract mode. | NNUE panel shows the HalfKP feature-to-accumulator-to-value flow. |
+| 2 | Launch with `startup.arch=off`, then select NNUE and use abstract mode. | NNUE panel shows the HalfKP feature-to-accumulator-to-value flow. |
 | 3 | Switch NNUE to detailed mode. | NNUE panel shows node/layer details, accumulator ranges, clipped activations, and centipawn value. |
 | 4 | Select CNN and use abstract mode. | CNN panel shows input planes, residual trunk, policy head, and WDL/value head as a high-level flow. |
 | 5 | Switch CNN to detailed mode. | CNN panel shows heatmaps, selected tensor statistics, policy/value outputs, or a clear missing-weights status. |
@@ -127,15 +127,17 @@ changing the legal chess position.
 ## 3. Demo screen recording
 
 Animated tutorial: [`docs/tutorial.gif`](tutorial.gif), generated 2026-05-09.
-Video source: [`docs/demo.mp4`](demo.mp4), duration 105.83 seconds. The GIF is
-960x600 at 12 FPS with 1270 frames. It was regenerated from a fresh live
-capture of the current app window, not from saved still-image files.
+Video source: [`docs/demo.mp4`](demo.mp4), duration 102.97 seconds at
+2560x1550 fullscreen. The GIF is 1280x775 at 12 FPS with 1236 frames. It was
+regenerated from a fresh live capture of the current app window, not from saved
+still-image files.
 
 The demo walkthrough shows:
 
-1. Launch/reset state and NNUE abstract view.
-2. NNUE detailed view, legal chess play, undo/redo, and move history.
-3. Random, Reset, Load FEN, Save FEN, and Flip.
+1. Fullscreen launch in OFF mode, then Reset and Flip.
+2. NNUE abstract and detailed views, legal chess play, undo/redo, and move
+   history.
+3. Random, Load FEN, Save FEN, and native search.
 4. Native engine-style search with live depth, node count, evaluation, and PV.
 5. CNN abstract and detailed views.
 6. BT4 abstract and detailed views.

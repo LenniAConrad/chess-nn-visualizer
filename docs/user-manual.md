@@ -150,10 +150,10 @@ it does not parse the official LC0 BT4 protobuf as exact trained weights.
 ```ini
 window.width=1280
 window.height=800
-window.fullscreen=false
+window.fullscreen=true
 assets.pieces=assets/pieces
 board.palette=red
-startup.arch=nnue
+startup.arch=off
 default.fen=rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 model.nnue=models/nnue-halfkp-demo.bin
 model.lc0_cnn=models/lc0-cnn-112p-10x128-policy4672-wdl3.bin

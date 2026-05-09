@@ -28,12 +28,13 @@ Related prior chess work:
 
 ![Full tutorial demo](docs/tutorial.gif)
 
-The animated walkthrough is a 12 FPS live capture from the current app build.
-It shows the full application flow: Reset, Flip, Undo/Redo, Random, Search,
-Load FEN, Save FEN, Setup, Edit FEN, editor sub-controls, the NNUE/CNN/BT4/OFF
-selector, abstract and detailed views for NNUE, CNN, and BT4, and the native
-engine-style search preview with live depth, nodes, evaluation, and PV. The
-full-resolution MP4 version is [docs/demo.mp4](docs/demo.mp4).
+The animated walkthrough is a 12 FPS fullscreen live capture from the current
+app build. It starts with the activation panel OFF, then selects NNUE, CNN,
+and BT4 and shows both abstract and detailed views for each architecture. It
+also covers Reset, Flip, Undo/Redo, Random, Search, Load FEN, Save FEN, Setup,
+Edit FEN, editor sub-controls, and the native engine-style search preview with
+live depth, nodes, evaluation, and PV. The full-resolution MP4 version is
+[docs/demo.mp4](docs/demo.mp4).
 
 ## Build
 

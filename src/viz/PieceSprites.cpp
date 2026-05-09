@@ -8,23 +8,17 @@ namespace cnnv::viz {
 
 namespace {
 
-// Render-target size for SVG rasterization. 256 px is enough for a roughly
-// 90-px-per-square board and stays sharp at 2x HiDPI scaling thanks to
-// bilinear filtering. Bumping to 512 doubled load time without a visible
-// difference at 1280x800.
-constexpr int kSvgRasterSize = 256;
-
 const char* fileNameFor(cnnv::chess::Piece p) {
     using namespace cnnv::chess;
     if (p.isNone()) return nullptr;
     bool w = p.color == Color::White;
     switch (p.type) {
-        case PieceType::Pawn:   return w ? "wP.svg" : "bP.svg";
-        case PieceType::Knight: return w ? "wN.svg" : "bN.svg";
-        case PieceType::Bishop: return w ? "wB.svg" : "bB.svg";
-        case PieceType::Rook:   return w ? "wR.svg" : "bR.svg";
-        case PieceType::Queen:  return w ? "wQ.svg" : "bQ.svg";
-        case PieceType::King:   return w ? "wK.svg" : "bK.svg";
+        case PieceType::Pawn:   return w ? "wP" : "bP";
+        case PieceType::Knight: return w ? "wN" : "bN";
+        case PieceType::Bishop: return w ? "wB" : "bB";
+        case PieceType::Rook:   return w ? "wR" : "bR";
+        case PieceType::Queen:  return w ? "wQ" : "bQ";
+        case PieceType::King:   return w ? "wK" : "bK";
         case PieceType::None:   return nullptr;
     }
     return nullptr;
@@ -40,8 +34,11 @@ PieceSprites::PieceSprites(const std::string& assetDir) {
                             PieceType::Rook, PieceType::Queen, PieceType::King}) {
             Piece p{c, t};
             const char* name = fileNameFor(p);
-            std::string path = assetDir + "/" + name;
-            Image img = LoadImageSvg(path.c_str(), kSvgRasterSize, kSvgRasterSize);
+            std::string pngPath = assetDir + "/" + name + ".png";
+            std::string svgPath = assetDir + "/" + name + ".svg";
+            Image img = LoadImage(FileExists(pngPath.c_str())
+                                      ? pngPath.c_str()
+                                      : svgPath.c_str());
             Texture2D tex{};
             if (img.data != nullptr) {
                 tex = LoadTextureFromImage(img);
