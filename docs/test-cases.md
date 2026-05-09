@@ -127,8 +127,8 @@ changing the legal chess position.
 ## 3. Demo screen recording
 
 Animated tutorial: [`docs/tutorial.gif`](tutorial.gif), generated 2026-05-09.
-Video source: [`docs/demo.mp4`](demo.mp4), duration 102.97 seconds at
-2560x1550 fullscreen. The GIF is 1280x775 at 12 FPS with 1236 frames. It was
+Video source: [`docs/demo.mp4`](demo.mp4), duration 104.57 seconds at
+2560x1550 fullscreen. The GIF is 1280x775 at 12 FPS with 1255 frames. It was
 regenerated from a fresh live capture of the current app window, not from saved
 still-image files.
 
