@@ -28,13 +28,14 @@ Related prior chess work:
 
 ![Full tutorial demo](docs/tutorial.gif)
 
-The animated walkthrough is a 12 FPS fullscreen live capture from the current
-app build. It starts with the activation panel OFF, then selects NNUE, CNN,
-and BT4 and shows both abstract and detailed views for each architecture. It
-also covers Reset, Flip, Undo/Redo, Random, Search, Load FEN, Save FEN, Setup,
-Edit FEN, editor sub-controls, and the native engine-style search preview with
-live depth, nodes, evaluation, and PV. The full-resolution MP4 version is
-[docs/demo.mp4](docs/demo.mp4).
+The animated walkthrough is a 12 FPS live capture of the app. The submitted
+configuration now starts windowed with the activation panel OFF; `F11` still
+toggles borderless fullscreen for demonstrations. The walkthrough selects
+NNUE, CNN, and BT4 and shows both abstract and detailed views for each
+architecture. It also covers Reset, Flip, Undo/Redo, Random, Search, Load FEN,
+Save FEN, Setup, Edit FEN, editor sub-controls, and the native engine-style
+search preview with live depth, nodes, evaluation, and PV. The full-resolution
+MP4 version is [docs/demo.mp4](docs/demo.mp4).
 
 ## Build
 
@@ -102,7 +103,7 @@ Before the final defense, run the complete readiness check:
 ```
 
 It verifies the required documents, tutorial media, local model files,
-fullscreen/OFF startup config, media metadata, and automated tests.
+windowed/OFF startup config, media metadata, and automated tests.
 
 ## API Documentation
 
@@ -156,4 +157,4 @@ PDF exports can be regenerated with:
 ./scripts/export_docs.sh
 ```
 
-The execution plan lives in [TODO.md](TODO.md).
+[TODO.md](TODO.md) is now a final submission checklist and defense prep note.

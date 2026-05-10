@@ -1510,6 +1510,7 @@ void App::handleInput() {
     if (IsKeyPressed(KEY_R)) resetGame();
     if (IsKeyPressed(KEY_S)) saveCurrentFen();
     if (IsKeyPressed(KEY_A)) cycleArchitecture();
+    if (IsKeyPressed(KEY_T)) enterEditor();
     if (IsKeyPressed(KEY_E)) toggleSearch();
     if (IsKeyPressed(KEY_L)) {
         stopSearch();
@@ -2148,7 +2149,7 @@ void App::render() {
     }
 
     drawText(m_theme,
-             "F flip  R reset  L load FEN  S save FEN  A view  E search",
+             "F flip  R reset  L load FEN  S save FEN  T setup  A view  E search",
              static_cast<int>(panel.x) + 12,
              static_cast<int>(panel.y + panel.height) - 34,
              13, m_theme.textMuted);

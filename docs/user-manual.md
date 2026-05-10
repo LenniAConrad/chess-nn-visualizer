@@ -22,9 +22,9 @@ Build and run from the repository root:
 ./scripts/run.sh
 ```
 
-The default submitted configuration starts in a fullscreen window with the
-activation panel set to OFF. The `window.width` and `window.height` values are
-used as the windowed fallback if fullscreen is disabled. The app reads
+The default submitted configuration starts in a resizable window with the
+activation panel set to OFF. The `window.width` and `window.height` values set
+the startup window size. The app reads
 `config.ini` at startup for window, font, model, default FEN, and clock
 settings.
 
@@ -46,7 +46,7 @@ Before the final defense, run:
 ```
 
 This verifies the required documents, tutorial media, local model files,
-fullscreen/OFF startup configuration, media metadata, and automated tests.
+windowed/OFF startup configuration, media metadata, and automated tests.
 
 ## 3. Playing a game
 
@@ -94,7 +94,7 @@ The save path is fixed for now.
 
 ## 6. Board editor
 
-Click Setup or press `A` to enter editor mode. Select a piece from the palette,
+Click Setup or press `T` to enter editor mode. Select a piece from the palette,
 left-click a square to place it, or right-click a square to erase it. The
 palette also has Eraser, Clear, and Startpos buttons.
 
@@ -146,7 +146,8 @@ it does not parse the official LC0 BT4 protobuf as exact trained weights.
 | `R` | Reset to the configured start position |
 | `L` | Open Load FEN |
 | `S` | Save current position to `position.fen` |
-| `A` | Enter Setup editor |
+| `T` | Enter Setup editor |
+| `A` | Cycle NNUE / CNN / BT4 / OFF activation view |
 | `E` | Start/stop the native search preview |
 | `F11` | Toggle borderless fullscreen |
 | `Ctrl+Z` | Undo one ply |
@@ -162,7 +163,7 @@ it does not parse the official LC0 BT4 protobuf as exact trained weights.
 ```ini
 window.width=1280
 window.height=800
-window.fullscreen=true
+window.fullscreen=false
 assets.pieces=assets/pieces
 board.palette=red
 startup.arch=off

@@ -40,7 +40,7 @@ check_file "NNUE runtime model" "models/nnue-halfkp-demo.bin"
 check_file "CNN runtime model" "models/lc0-cnn-112p-10x128-policy4672-wdl3.bin"
 check_file "BT4 runtime model" "models/lc0-bt4-1024x15x32h-visual.bin"
 
-check_config_value "window.fullscreen" "true"
+check_config_value "window.fullscreen" "false"
 check_config_value "startup.arch" "off"
 
 if command -v ffprobe >/dev/null 2>&1; then

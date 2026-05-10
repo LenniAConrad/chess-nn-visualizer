@@ -347,6 +347,41 @@ lookup tables hidden inside their implementations.
 | `BoardView` | `draw`, `squareAtPixel`, `setSelection`, `setLegalDestinations`, `setActivationOverlay` | Renders board, pieces, highlights, drag state, and activation overlays. |
 | `IActivationView` | `update`, `setBounds`, `draw`, `name` | Polymorphic UI interface for NNUE/CNN/BT4 panels. |
 
+### 6.4 Neural-network evaluation flow
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Game
+    participant Net as INetwork
+    participant Snap as ActivationSnapshot
+    participant View as IActivationView
+
+    App->>Game: current Position
+    App->>Net: evaluate(Position, Snapshot)
+    Net->>Snap: store named tensors
+    App->>View: update(Snapshot)
+    View->>App: draw(theme)
+```
+
+NNUE, CNN, and BT4 share this path. `App` owns the concrete networks and
+activation views, but it talks to them through `INetwork` and
+`IActivationView`, which keeps the UI code independent from each network's
+specific tensor layout.
+
+### 6.5 Teacher/TA review map
+
+| Rubric item | Where to inspect |
+| --- | --- |
+| Classes and encapsulation | `src/chess/Position.*`, `src/game/Game.*`, `src/nn/Tensor.h`, `src/viz/App.*` |
+| Inheritance and polymorphism | `src/nn/INetwork.h`, `src/viz/IActivationView.h`, concrete NN/view classes |
+| Templates | `src/nn/Tensor.h` |
+| Arrays / fixed storage | `src/chess/MoveList.*`, bitboards, tensor buffers |
+| Linked list | `src/game/MoveHistory.*` |
+| File I/O | `src/io/ConfigIo.*`, `src/io/FenIo.*`, `src/io/WeightFileReader.*`, `src/game/Pgn.*` |
+| Testing | `tests/`, `scripts/test.sh`, `docs/test-cases.md` |
+| Demo evidence | `docs/tutorial.gif`, `docs/demo.mp4` |
+
 ## 7. Main technical difficulties and solutions
 
 ### 7.1 Legal chess correctness

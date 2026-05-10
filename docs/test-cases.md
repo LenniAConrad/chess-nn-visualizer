@@ -13,10 +13,10 @@ Command:
 Latest automated run:
 
 ```text
-Date: 2026-05-09
+Date: 2026-05-10
 Result: PASS
 ctest: 1/1 test passed, 0 failed
-Total test time: 0.06 seconds
+Local test time: under 1 second
 ```
 
 Coverage:
@@ -60,7 +60,7 @@ and CNN forward-pass behavior.
 
 Date: 2026-05-08
 
-Environment: Linux/X11, default fullscreen application window.
+Environment: Linux/X11, default windowed application window.
 
 Kiwipete FEN used:
 
@@ -92,7 +92,7 @@ r3k2r/p1ppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
 
 Date: 2026-05-08
 
-Environment: Linux/X11, default fullscreen application window.
+Environment: Linux/X11, default windowed application window.
 
 Result: PASS
 
@@ -107,7 +107,7 @@ Result: PASS
 
 Date: 2026-05-09
 
-Environment: Linux/X11, default fullscreen application window.
+Environment: Linux/X11, default windowed application window.
 
 Result: PASS when all three architecture buttons can be selected without
 changing the legal chess position.
@@ -128,13 +128,15 @@ changing the legal chess position.
 
 Animated tutorial: [`docs/tutorial.gif`](tutorial.gif), generated 2026-05-09.
 Video source: [`docs/demo.mp4`](demo.mp4), duration 104.57 seconds at
-2560x1550 fullscreen. The GIF is 1280x775 at 12 FPS with 1255 frames. It was
-regenerated from a fresh live capture of the current app window, not from saved
-still-image files.
+2560x1550 from the app window used for the recording. The GIF is 1280x775 at
+12 FPS with 1255 frames. The current submitted configuration launches windowed
+by default, while `F11` still toggles borderless fullscreen for demonstrations.
+The media was regenerated from a fresh live capture, not from saved still-image
+files.
 
 The demo walkthrough shows:
 
-1. Fullscreen launch in OFF mode, then Reset and Flip.
+1. Launch in OFF mode, then Reset and Flip.
 2. NNUE abstract and detailed views, legal chess play, undo/redo, and move
    history.
 3. Random, Load FEN, Save FEN, and native search.
@@ -156,6 +158,6 @@ Command:
 ```
 
 Expected result: the script reports that all required PDFs, tutorial media,
-runtime model files, fullscreen/OFF startup settings, media metadata, and
+runtime model files, windowed/OFF startup settings, media metadata, and
 automated tests are present. If a model file is missing, run
 `./scripts/import_models.sh` and re-run the check before the live demo.
