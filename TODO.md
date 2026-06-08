@@ -52,7 +52,7 @@ Run:
 Use this archive for a complete file upload:
 
 ```text
-dist/cpp-nn-visualizer-submission.zip
+dist/cpp-nn-visualizer-final-project.zip
 ```
 
 The archive includes ignored local runtime artifacts such as `models/*.bin` and
