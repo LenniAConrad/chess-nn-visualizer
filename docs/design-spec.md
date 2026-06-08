@@ -1,453 +1,312 @@
 # Design Specification
 
-## 1. Project overview
+## 1. Purpose
 
-`cpp-nn-visualizer` is a native C++17 raylib application for playing a legal
-human-vs-human chess game and inspecting neural-network activations for the
-current position. The chess core is independent of raylib and NN code so it can
-be unit-tested with perft, FEN, SAN, and game-loop tests.
+`cpp-nn-visualizer` is a C++17 desktop application for legal chess play and
+model introspection. The program has two goals:
 
-## 2. High-level architecture
+1. Provide a complete human-vs-human chess board for Tutorial III and the final
+   project demo.
+2. Visualize how several chess evaluation families process the current
+   position: NNUE, LC0 CNN, LC0 BT4, and a handcrafted Classical evaluator.
 
-The executable links two static libraries:
+The program is intentionally split so chess rules and model inference can be
+tested without raylib, while the raylib layer only handles presentation and
+input.
 
-- `cnnv_core`: chess rules, game state, file I/O, tensor ops, and network
-  inference.
-- `cnnv_viz`: raylib views and input handling. This layer owns no chess rules;
-  it requests legal moves through `game::Game` and `chess::MoveGenerator`.
+## 2. Build Targets
 
-## 3. Module responsibilities
+The executable is assembled from two internal static libraries:
 
-### 3.1 chess — legal-move core
+| Target | Responsibility |
+| --- | --- |
+| `cnnv_core` | Chess rules, game state, file I/O, tensor operations, NN loaders, NN forward passes, Classical evaluator, and MCTS. |
+| `cnnv_viz` | raylib UI, board rendering, controls, dialogs, activation views, editor, and tree visualization. |
+| `cnnv` | Thin executable entry point linking `cnnv_viz` and `cnnv_core`. |
+| `cnnv_tests` | Headless test binary run through CTest. |
 
-The `chess` module owns board representation, FEN/SAN notation, move
-generation, make/unmake, draw/checkmate helpers, and Zobrist hashing. It is
-designed around bitboards for fast set operations plus a 64-square mailbox for
-simple UI and parser lookups.
+This split prevents raylib from leaking into the chess and NN modules.
 
-### 3.2 game — game state and history
+## 3. Class Diagram
 
-The `game` module owns the current `Position`, legal move application, status
-calculation, and the manually implemented linked-list move history. All
-mutation paths go through `game::Game` so the board, FEN snapshots, SAN text,
-undo, redo, and UI move list stay consistent.
-
-### 3.3 nn — architecture-agnostic NN building blocks
-
-The `nn` module contains shared tensor and activation infrastructure:
-`Tensor<T, Rank>`, `ActivationSnapshot`, `INetwork`, and low-level operations
-such as matrix multiplication, convolution, batch normalization, layer
-normalization, activation functions, and attention. CUDA kernels are optional;
-the CPU path remains the required runtime path.
-
-### 3.4 nn/nnue — NNUE half-KP
-
-The NNUE module implements feature encoding, accumulator refresh, model loading,
-and a forward pass that exposes accumulator values, clipped activations, active
-features, output weights, piece contributions, and a centipawn score.
-
-### 3.5 nn/lc0_cnn — Leela CNN ResNet
-
-The CNN module encodes the board into 112 input planes, runs a float32 LC0-style
-residual trunk, policy head, and WDL/value head, then stores intermediate
-feature maps in the shared activation snapshot for visualization.
-
-### 3.6 nn/lc0_bt4 — Leela BT4 transformer
-
-The BT4 module exposes a native C++ token-transformer visualization path. It
-uses the same board-plane encoder, projects the position to 64 square tokens,
-runs deterministic attention/FFN blocks, and produces policy/value summaries.
-This is not a protobuf-compatible LC0 BT4 weight loader; it validates the
-project's BT4 `.bin` metadata file and uses a C++ model path designed for
-explainable visualization.
-
-### 3.7 viz — raylib UI
-
-The `viz` module owns all raylib drawing and input handling: board rendering,
-piece sprites, controls, move list, FEN dialog, setup editor, activation views,
-promotion picker, theme, clocks, and asynchronous evaluation/search previews.
-It depends on `game`, `chess`, `nn`, and `io`, but those lower layers do not
-depend on raylib.
-
-### 3.8 io — file I/O
-
-The `io` module loads and saves configuration, FEN files, PGN text, and binary
-weight blobs. These are the project's main file-I/O paths and are used by both
-the user workflow and the grading requirement.
-
-## 4. Class diagram
-
-The main class diagram is provided as an image generated from
-`docs/class-diagram.dot`:
+The high-level class diagram is generated from `docs/class-diagram.dot`.
 
 ![Core class diagram](class-diagram.png)
 
-### 4.1 Chess core class diagram
+## 4. Module Responsibilities
 
-```mermaid
-classDiagram
-    class Color {
-        <<enumeration>>
-        White
-        Black
-    }
+### 4.1 `src/chess`
 
-    class PieceType {
-        <<enumeration>>
-        None
-        Pawn
-        Knight
-        Bishop
-        Rook
-        Queen
-        King
-    }
+The chess module owns all legal chess rules:
 
-    class Square {
-        <<enumeration>>
-        A1..H8
-        None
-    }
+- `Position`: board state, side to move, castling, en-passant, clocks, make and
+  unmake, check/draw helpers, and hash history.
+- `Move`: packed UCI-style move representation.
+- `MoveList`: fixed-capacity legal move container.
+- `MoveGenerator`: legal move generation with check filtering.
+- `Fen` and `San`: notation parsing/formatting.
+- `PositionEditor`: mutable editor facade with validation.
+- `Perft` and `Zobrist`: rule regression and hashing helpers.
 
-    class BitboardHelpers {
-        <<namespace>>
-        +popcount(Bitboard) int
-        +lsb(Bitboard) int
-        +popLsb(Bitboard&) int
-        +setBit(Bitboard&, int) void
-        +clearBit(Bitboard&, int) void
-        +testBit(Bitboard, int) bool
-    }
+The implementation uses bitboards for fast attacks and occupancy, plus a
+64-square mailbox array for direct UI/parser lookup.
 
-    class Piece {
-        +Color color
-        +PieceType type
-        +isNone() bool
-    }
+### 4.2 `src/chess/eval`
 
-    class Move {
-        -uint16_t m_value
-        +from() Square
-        +to() Square
-        +promotion() Promotion
-        +toUci() string
-        +parseUci(string) Move
-    }
+The Classical evaluator is a model-free C++ port of the chess-rtk handcrafted
+evaluator. It returns:
 
-    class MoveList {
-        -Move m_moves[256]
-        -size_t m_size
-        +push(Move) void
-        +clear() void
-        +size() size_t
-        +swapErase(size_t) void
-    }
+- an 11-term white-perspective centipawn breakdown,
+- a side-to-move WDL triplet,
+- per-piece piece-square tables,
+- an occupied-square PST heatmap for the board overlay.
 
-    class StateInfo {
-        +Piece capturedPiece
-        +uint8_t prevCastlingRights
-        +Square prevEpSquare
-        +int prevHalfmoveClock
-        +Move moveMade
-    }
+The visualizer uses this as its own activation choice and as a fallback
+evaluation path for search.
 
-    class Position {
-        -Bitboard m_pieces[2][6]
-        -Bitboard m_byColor[2]
-        -Bitboard m_occupied
-        -Piece m_board[64]
-        -Color m_sideToMove
-        -uint8_t m_castlingRights
-        -Square m_epSquare
-        -int m_halfmoveClock
-        -int m_fullmoveNumber
-        -vector~StateInfo~ m_history
-        -vector~uint64_t~ m_hashHistory
-        +pieceAt(Square) Piece
-        +make(Move) void
-        +unmake() void
-        +inCheck() bool
-        +hash() uint64_t
-    }
+### 4.3 `src/game`
 
-    class Fen {
-        <<utility>>
-        +parse(string) optional~Position~
-        +format(Position) string
-    }
+The game module wraps `Position` into a user-facing game:
 
-    class MoveGenerator {
-        <<utility>>
-        +generateLegal(Position&, MoveList&) void
-    }
+- `Game`: legal move application, undo/redo, FEN loading, status, move list
+  jumps, and game reset.
+- `MoveHistory`: a manually implemented doubly linked list of move records.
+- `Pgn`: PGN export helpers.
 
-    class SlidingAttacks {
-        <<namespace>>
-        +bishopAttacks(int, Bitboard) Bitboard
-        +rookAttacks(int, Bitboard) Bitboard
-        +queenAttacks(int, Bitboard) Bitboard
-        +knightAttacks(int) Bitboard
-        +kingAttacks(int) Bitboard
-        +pawnAttacks(int, Color) Bitboard
-    }
+All normal board mutations go through `Game`, which keeps SAN, FEN snapshots,
+and undo/redo state consistent.
 
-    class Perft {
-        <<utility>>
-        +perft(Position&, int) uint64_t
-    }
+### 4.4 `src/io`
 
-    class San {
-        <<utility>>
-        +toSan(Position, Move) string
-        +parse(Position, string) Move
-    }
+The I/O module contains:
 
-    class Zobrist {
-        <<utility>>
-        +computeZobristHash(Position) uint64_t
-    }
+- `Config`: flat key/value config loader and saver.
+- `FenIo`: FEN file save/load helpers.
+- `WeightFileReader`: little-endian binary reader for model blobs.
 
-    Piece --> Color
-    Piece --> PieceType
-    Move --> Square
-    MoveList o-- Move
-    StateInfo --> Piece
-    StateInfo --> Move
-    StateInfo --> Square
-    Position *-- StateInfo
-    Position --> Piece
-    Position --> Color
-    Position --> Square
-    Fen ..> Position
-    MoveGenerator ..> Position
-    MoveGenerator ..> MoveList
-    MoveGenerator ..> SlidingAttacks
-    Perft ..> MoveGenerator
-    San ..> MoveGenerator
-    Zobrist ..> Position
-```
+Runtime configuration is read once at startup from `config.ini`.
 
-## 5. Data members
+### 4.5 `src/nn`
 
-### 5.1 Chess core data member descriptions
+The shared NN layer contains:
 
-| Type | Member | Description |
-| --- | --- | --- |
-| `Piece` | `color` | Side that owns the piece. Ignored when `type == PieceType::None`. |
-| `Piece` | `type` | Piece kind, with `None` used for empty squares and parser failures. |
-| `Move` | `m_value` | Packed 16-bit UCI move: bits 0-5 from-square, bits 6-11 to-square, bits 12-14 promotion code, `0xFFFF` for no move. Castling and en-passant are inferred from the position. |
-| `MoveList` | `m_moves` | Fixed array of 256 moves, large enough for the known legal-move upper bound and allocation-free in move generation. |
-| `MoveList` | `m_size` | Number of valid entries currently stored in `m_moves`. |
-| `StateInfo` | `capturedPiece` | Captured piece saved before `Position::make`; `kNoPiece` if the move was not a capture. |
-| `StateInfo` | `prevCastlingRights` | Four-bit castling-rights mask before the move. |
-| `StateInfo` | `prevEpSquare` | En-passant target square before the move, or `Square::None`. |
-| `StateInfo` | `prevHalfmoveClock` | Fifty-move counter before the move. |
-| `StateInfo` | `moveMade` | Move being reversed by `Position::unmake`. |
-| `Position` | `m_pieces` | Twelve bitboards indexed by color and piece type, excluding `PieceType::None`. This is the primary fast representation for attack and occupancy queries. |
-| `Position` | `m_byColor` | Two aggregate bitboards containing all white pieces and all black pieces. |
-| `Position` | `m_occupied` | Union of both color occupancies. |
-| `Position` | `m_board` | 64-entry mailbox board used for O(1) `pieceAt` lookups by UI, parsers, and make/unmake. It is redundant with the bitboards and must be kept in sync by `placePiece`/`removePiece`. |
-| `Position` | `m_sideToMove` | Side whose legal moves are generated and whose king is checked by `inCheck`. |
-| `Position` | `m_castlingRights` | Four-bit mask using `WhiteKing`, `WhiteQueen`, `BlackKing`, and `BlackQueen`. |
-| `Position` | `m_epSquare` | Current en-passant target square, or `Square::None` when no en-passant capture is legal. |
-| `Position` | `m_halfmoveClock` | Halfmove counter for the fifty-move rule. It resets after pawn moves and captures. |
-| `Position` | `m_fullmoveNumber` | FEN fullmove number, incremented after each black move. |
-| `Position` | `m_history` | Stack of `StateInfo` records that lets `unmake` restore irreversible state in O(1). |
-| `Position` | `m_hashHistory` | Sequence of Zobrist hashes since the current game/setup anchor. Repetition detection scans the reversible-move window. |
+- `Tensor<T, Rank>`: rank-aware template tensor container.
+- `ActivationSnapshot`: string-keyed activation tensor store.
+- `INetwork`: polymorphic evaluator interface.
+- `ops/`: CPU tensor operations such as convolution, matmul, attention,
+  batch norm, layer norm, softmax, and activation functions.
+- `CudaOps`: optional CUDA acceleration hooks; CPU remains the required path.
 
-`Bitboard` is a `uint64_t` value with A1 at bit 0 and H8 at bit 63. `Square`,
-`Color`, `PieceType`, `Fen`, `MoveGenerator`, `San`, `Perft`, `SlidingAttacks`,
-and `Zobrist` do not own persistent data beyond local temporaries and static
-lookup tables hidden inside their implementations.
+Each network writes named tensors into an `ActivationSnapshot`. The UI copies
+only the tensors it needs.
 
-### 5.2 Game and history data member descriptions
+### 4.6 `src/nn/nnue`
 
-| Type | Member | Description |
-| --- | --- | --- |
-| `MoveRecord` | `move` | The move stored in this history node. |
-| `MoveRecord` | `fenBefore` | Position before the move, used for reliable undo/jump reconstruction and debugging. |
-| `MoveRecord` | `fenAfter` | Position after the move, used for redo and move-list navigation. |
-| `MoveRecord` | `san` | Human-readable move text displayed in the move history. |
-| `MoveRecord` | `prev`, `next` | Manual doubly linked-list links for undo/redo traversal. |
-| `MoveHistory` | `m_head` | First move in the current linear game line, or `nullptr` at game start. |
-| `MoveHistory` | `m_current` | Most recently applied move; undo moves it toward `nullptr`, redo moves it toward the tail. |
-| `Game` | `m_position` | Current legal chess position. |
-| `Game` | `m_history` | Linked-list history synchronized with `m_position`. |
+The NNUE module implements:
 
-### 5.3 Neural-network data member descriptions
+- HalfKP feature encoding,
+- accumulator refresh,
+- compact `NNUE` binary loading,
+- clipped activation and output contribution calculation,
+- learned-weight atlas tensors for the NNUE panel.
 
-| Type | Member | Description |
-| --- | --- | --- |
-| `Tensor<T, Rank>` | `m_data` | Contiguous row-major data buffer. |
-| `Tensor<T, Rank>` | `m_shape` | Compile-time-rank array storing each dimension length. |
-| `Tensor<T, Rank>` | `m_strides` | Precomputed flat-index strides for fast `at(...)` access. |
-| `ActivationSnapshot::Entry` | `shape` | Runtime shape of one activation tensor. |
-| `ActivationSnapshot::Entry` | `data` | Flat float buffer for one activation tensor. |
-| `ActivationSnapshot` | `m_entries` | Map from descriptive snapshot keys to activation entries. |
-| `nnue::Network` | `m_weights` | Loaded or fallback NNUE weights, including feature weights, biases, output weights, and scaling. |
-| `lc0_cnn::Network` | `m_weights` | Loaded LC0-style residual network weights, including trunk, policy, and value head data. |
-| `lc0_bt4::Network` | static constants | Token count, model dimension, block count, attention head count, and policy size for the native transformer visualization. |
+The default file is `models/nnue-halfkp-demo.bin`.
 
-### 5.4 I/O and visualization data member descriptions
+### 4.7 `src/nn/lc0_cnn`
 
-| Type | Member | Description |
-| --- | --- | --- |
-| `Config` | `m_values` | Sorted map of flat INI-style key/value settings. |
-| `WeightFileReader` | `m_stream` | Open binary input stream for model files. |
-| `WeightFileReader` | `m_path` | Source path used in diagnostics. |
-| `WeightFileReader` | `m_size` | File size captured at open time for bounds/diagnostic checks. |
-| `BoardView` | `m_position` | Non-owning pointer to the position currently being drawn. |
-| `BoardView` | `m_bounds` | Rectangle occupied by the board in raylib screen coordinates. |
-| `BoardView` | `m_selection`, `m_legalTargets`, `m_lastMove` | Visual overlays for interaction feedback. |
-| `BoardView` | `m_overlay` | Per-square activation heatmap values. |
-| `App` | `m_config` | Runtime configuration loaded from `config.ini` or an alternate config path. |
-| `App` | `m_game` | Single owner of the playable game state. |
-| `App` | `m_board`, `m_controls`, dialogs, and view pointers | Owned UI components that draw and handle user interaction. |
-| `App` | `m_nnue`, `m_cnn`, `m_bt4` | Owned network evaluators for the architecture selector. |
-| `App` | `m_snapshot` and `m_evalCaches` | Latest activation data plus per-architecture cached snapshots by Zobrist hash. |
-| `App` | `m_evalFuture`, `m_searchFuture` | Background tasks so evaluation/search do not block the render loop. |
-| `App` | `m_editor` and editor widgets | Temporary board setup state and validation UI. |
+The CNN module implements:
 
-## 6. Function members
+- canonical LC0 112-plane input encoding,
+- `LC0J` binary loading,
+- residual trunk forward pass,
+- policy head with compressed 4672-entry policy map,
+- WDL/value head,
+- final board heatmap and per-layer tensor snapshots.
 
-### 6.1 Chess and game functions
+The default file is
+`models/lc0-cnn-small-112p-4x32-policy4672-wdl3.bin`. It has 4 residual blocks,
+32 trunk channels, 73 policy planes, 4672 policy logits, and 3 WDL outputs.
 
-| Class / module | Important functions | Purpose |
-| --- | --- | --- |
-| `Position` | `clear`, `setStartpos`, `placePiece`, `removePiece`, `make`, `unmake` | Maintain board state, apply legal moves, and restore previous positions. |
-| `Position` | `pieceAt`, `occupied`, `sideToMove`, `castlingRights`, `epSquare`, `hash` | Read-only accessors used by move generation, UI, file I/O, and neural-network encoders. |
-| `Position` | `isSquareAttacked`, `inCheck`, `hasLegalMoves`, `isCheckmate`, `isStalemate`, `isInsufficientMaterial`, `isThreefoldRepetition` | Rules and game-status helpers. |
-| `MoveGenerator` | `generateLegal(Position&, MoveList&)` | Builds pseudo-legal moves and filters them by make/unmake and check validation. |
-| `Fen` | `parse`, `format` | Converts between standard six-field FEN strings and `Position`. |
-| `San` | `toSan`, `parse` | Converts legal moves to/from SAN notation for the move list and tests. |
-| `Perft` | `perft(Position&, int)` | Counts legal move trees for move-generator validation. |
-| `Game` | `reset`, `loadFen`, `tryMove`, `undo`, `redo`, `jumpToPly`, `status`, `statusText` | Owns the playable game state and synchronizes position/history/UI behavior. |
-| `MoveHistory` | `pushMove`, `undo`, `redo`, `clear`, `size`, `plyCount` | Manual doubly linked list used for undo/redo and move-list rendering. |
+### 4.8 `src/nn/lc0_bt4`
 
-### 6.2 Neural-network functions
+The BT4 module has two paths:
 
-| Class / module | Important functions | Purpose |
-| --- | --- | --- |
-| `Tensor<T, Rank>` | `reshape`, `fill`, `at`, `data`, `shape`, `dim` | Generic container used by NN code and tests. |
-| `ActivationSnapshot` | `allocate`, `store`, `has`, `find`, `data`, `shape` | Network-agnostic storage for activations keyed by descriptive strings. |
-| `INetwork` | `load`, `evaluate`, `name` | Polymorphic interface shared by all architecture implementations. |
-| `nnue::Network` | `load`, `evaluate`, `hiddenSize`, `isLoaded` | Loads NNUE weights and publishes accumulator/output activations. |
-| `lc0_cnn::Network` | `load`, `evaluate`, `weights`, `isLoaded` | Loads LC0-style CNN weights and publishes trunk, policy, and value tensors. |
-| `lc0_bt4::Network` | `load`, `evaluate`, `isLoaded` | Runs the native BT4-style token visualization pipeline. |
-| `ops` functions | `matmul`, `conv2d`, `relu`, `mish`, `softmax`, `layer_norm`, `attention` | Hand-written C++ NN operations used by the architecture implementations. |
-
-### 6.3 I/O and visualization functions
-
-| Class / module | Important functions | Purpose |
-| --- | --- | --- |
-| `Config` | `load`, `save`, `getString`, `getInt`, `getBool`, `setString`, `setInt`, `setBool` | INI-style user configuration with typed accessors. |
-| `FenIo` | `loadPositionFromFenFile`, `savePositionToFenFile` | Reads and writes FEN positions from text files. |
-| `WeightFileReader` | `open`, `read_u32`, `read_f32_array`, `seek`, `size` | Little-endian binary model reader with schema validation handled by callers. |
-| `App` | `run`, `handleInput`, `render`, `selectArchitecture`, `evaluateIfStale`, `saveCurrentFen`, `loadFenFromDialog` | Top-level coordinator for raylib lifetime, UI state, game state, and asynchronous evaluation. |
-| `BoardView` | `draw`, `squareAtPixel`, `setSelection`, `setLegalDestinations`, `setActivationOverlay` | Renders board, pieces, highlights, drag state, and activation overlays. |
-| `IActivationView` | `update`, `setBounds`, `draw`, `name` | Polymorphic UI interface for NNUE/CNN/BT4 panels. |
-
-### 6.4 Neural-network evaluation flow
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant Game
-    participant Net as INetwork
-    participant Snap as ActivationSnapshot
-    participant View as IActivationView
-
-    App->>Game: current Position
-    App->>Net: evaluate(Position, Snapshot)
-    Net->>Snap: store named tensors
-    App->>View: update(Snapshot)
-    View->>App: draw(theme)
-```
-
-NNUE, CNN, and BT4 share this path. `App` owns the concrete networks and
-activation views, but it talks to them through `INetwork` and
-`IActivationView`, which keeps the UI code independent from each network's
-specific tensor layout.
-
-### 6.5 Teacher/TA review map
-
-| Rubric item | Where to inspect |
+| Path | Use |
 | --- | --- |
-| Classes and encapsulation | `src/chess/Position.*`, `src/game/Game.*`, `src/nn/Tensor.h`, `src/viz/App.*` |
-| Inheritance and polymorphism | `src/nn/INetwork.h`, `src/viz/IActivationView.h`, concrete NN/view classes |
-| Templates | `src/nn/Tensor.h` |
-| Arrays / fixed storage | `src/chess/MoveList.*`, bitboards, tensor buffers |
-| Linked list | `src/game/MoveHistory.*` |
-| File I/O | `src/io/ConfigIo.*`, `src/io/FenIo.*`, `src/io/WeightFileReader.*`, `src/game/Pgn.*` |
-| Testing | `tests/`, `scripts/test.sh`, `docs/test-cases.md` |
-| Demo evidence | `docs/tutorial.gif`, `docs/demo.mp4` |
+| `BT4J` v2 real path | Loads compact CRTK BT4 weights and runs a native transformer forward pass. |
+| `BT4V` synthetic fallback | Validates legacy metadata and generates deterministic transformer-like activations if no real BT4J model is loaded. |
 
-## 7. Main technical difficulties and solutions
+The default file is `models/lc0-bt4-tiny-96x4x4h.bin`. It is a compact real
+BT4J v2 model generated by `scripts/generate_small_bt4.py` with:
 
-### 7.1 Legal chess correctness
+- 112 canonical input channels,
+- 64 board tokens,
+- 96-dimensional token embeddings,
+- 4 encoder blocks,
+- 4 attention heads,
+- attention policy head to 1858 logits,
+- WDL value head.
 
-Chess move legality is difficult because castling, en-passant, promotion,
-checks, pins, and repetition all interact with state. The solution is to keep
-the fast bitboard representation and the simple mailbox representation inside
-one `Position` class, then force all legal play through `MoveGenerator` and
-`Position::make/unmake`. Perft and rule-specific tests validate the result.
+The loader and forward structs are written to support more BT4J components
+than the tiny default uses, including optional smolgen records and larger
+topologies. The official LC0 protobuf file format is not parsed at runtime.
 
-### 7.2 Undo/redo without corrupting game state
+### 4.9 `src/search`
 
-The game needs interactive undo/redo and move-list navigation. `MoveHistory`
-uses a manual doubly linked list of `MoveRecord` nodes, each storing move, SAN,
-FEN-before, and FEN-after. `Game` owns both `Position` and `MoveHistory`, so UI
-code cannot mutate the board without also keeping history consistent.
+`Mcts` is a single-threaded PUCT search engine used by the tree workbench. It
+is independent of raylib and accepts an evaluator callback:
 
-### 7.3 Neural-network activation volume
+```cpp
+using Evaluator =
+    std::function<LeafEval(const Position&, const MoveList&)>;
+```
 
-The application visualizes many thousands of activation values, not just a
-single score. `ActivationSnapshot` stores flat float buffers with explicit
-shapes. Each architecture publishes only the tensors that the UI needs, while
-views copy out compact summaries for drawing. This keeps the render loop
-responsive and avoids architecture-specific types leaking into the UI.
+The app supplies a callback that evaluates leaves through the selected
+architecture where possible. The search exposes bounded snapshots containing
+FEN, move, visits, prior, Q value, PV membership, and transposition signature
+for rendering.
 
-### 7.4 Translating prior chess work into C++
+### 4.10 `src/viz`
 
-Some chess and NN ideas came from prior Java/TypeScript chess projects, but
-C++ required different ownership, header layout, memory handling, and build
-rules. The project uses RAII classes, explicit value types, standard containers,
-and CMake targets instead of directly copying runtime dependencies from the
-other projects.
+The visualization layer owns raylib resources and UI state:
 
-### 7.5 Visual representation of dense models
+- `App`: window lifetime, layout, input dispatch, model loading, async
+  evaluation, search preview, MCTS worker, and rendering.
+- `BoardView`: board, pieces, coordinates, selection, last move, legal targets,
+  drag piece, and heatmap overlays.
+- `Controls`: command button grid with active-state rendering.
+- `NnueView`, `CnnView`, `Bt4View`, `ClassicalView`: architecture panels.
+- `TreeView`: full-window MCTS graph with mini-board nodes.
+- `FenInputDialog`, `PromotionPicker`, `EditorPalette`, `EditorPanel`,
+  `MoveListView`: focused widgets for the chess workflow.
 
-Raw NN activations are too large to show literally. The UI therefore maps
-values into interpretable summaries: board overlays, heatmaps, bar charts,
-feature counts, policy/value summaries, token grids, and attention maps. The
-visual design was adjusted manually because generic AI-generated layout
-suggestions were often not usable for a raylib desktop tool.
+## 5. Major Data Members And Ownership
 
-## 8. File I/O justification
-
-The project uses file I/O in several user-visible and implementation-critical
-ways:
-
-| File I/O path | Files | Reason |
+| Class | Key data | Ownership / invariant |
 | --- | --- | --- |
-| Configuration | `config.ini` | Window size, model paths, default FEN, clock, and theme settings can be changed without recompiling. |
-| FEN save/load | `position.fen` and user-entered FEN files | Demonstrates text file input/output and supports reproducible board setup. |
-| Model loading | `models/*.bin` | Binary file reading is required for NNUE/CNN/BT4-related model data. |
-| PGN export support | `src/game/Pgn.*` | Converts played move history to standard chess notation for sharing games. |
-| Test data | `tests/data/nnue_ref.jsonl` | Numerical tests compare C++ outputs against saved reference data. |
+| `Position` | bitboards, mailbox board, irreversible-state stack, hash history | Owns chess state; bitboards and mailbox are updated together. |
+| `Move` | packed `uint16_t` value | Value type; castling/en-passant meaning is interpreted through `Position`. |
+| `MoveList` | fixed array of up to 256 moves | Stack-friendly legal-move container with no heap allocation. |
+| `Game` | `Position`, `MoveHistory` | Single mutation gateway for user-visible play. |
+| `MoveHistory` | `MoveRecord* head/current` | Manually managed doubly linked list for undo/redo and move-list rendering. |
+| `ActivationSnapshot` | map of string keys to tensor entries | Owns copied activation vectors produced by network evaluation. |
+| `Tensor<T, Rank>` | `std::vector<T>`, shape, strides | Generic storage for tensor operations and tests. |
+| `lc0_cnn::Network` | parsed `Weights`, policy reverse map | Owns model weights; reverse map is built lazily. |
+| `lc0_bt4::Network` | `Bt4RealWeights`, real/synthetic flag | Uses real BT4J weights when loaded; otherwise synthetic fallback. |
+| `search::Mcts` | node vector, stats vector, signature map | Owns tree state and emits render-friendly snapshots. |
+| `App` | game, config, sprites, views, futures, threads, caches | Top-level owner of runtime state and raylib window lifetime. |
+| `BoardView` | non-owning `Position*`, non-owning `PieceSprites*` | Renders the position owned by `Game` or an evaluation override. |
+| `TreeView` | `search::Snapshot`, display nodes, parsed mini-boards | Owns display data derived from the latest MCTS snapshot. |
 
-The project therefore satisfies the mandatory file-I/O requirement through real
-application features rather than unrelated demonstration files.
+## 6. Runtime Data Flow
 
-## 9. Code quality and rationality
+Normal board mode:
 
-- Core rules, model logic, I/O, and rendering are separated into modules.
-- Public members are limited; mutable state is mostly private and accessed
-  through narrow methods.
-- Inheritance is used only for real polymorphic boundaries (`INetwork`,
-  `IActivationView`).
-- Templates are used where they remove duplication (`Tensor<T, Rank>`).
-- The hand-written linked list is isolated in `MoveHistory`, so the rest of the
-  application can use a simple game-history interface.
-- Global mutable state is avoided; long-lived state is owned by `App`, `Game`,
-  or specific model/view classes.
+```text
+mouse/keyboard input
+    -> App
+    -> Game / Position
+    -> async architecture evaluation
+    -> ActivationSnapshot
+    -> BoardView overlay + active activation view
+    -> raylib frame
+```
+
+Tree mode:
+
+```text
+Start button
+    -> App::startMcts
+    -> search::Mcts worker thread
+    -> bounded search::Snapshot frames
+    -> TreeView layout
+    -> selected/followed FEN optional evaluation override
+```
+
+Search preview mode:
+
+```text
+Search button / E
+    -> background alpha-beta style preview
+    -> selected architecture evaluator when available
+    -> current preview position
+    -> activation panel traces that preview position
+```
+
+## 7. Threading Model
+
+The render loop stays on the main thread. Long-running work is moved off the
+frame path:
+
+- network evaluation runs through a future and is guarded by a mutex when
+  accessing network objects,
+- live search preview runs in an async job with an atomic cancellation flag,
+- MCTS tree growth runs in a worker thread and publishes snapshots under a
+  mutex.
+
+The UI copies completed results back into view-owned state before drawing.
+Search is stopped when the root position changes so stale search output is not
+applied to a different board.
+
+## 8. File Formats
+
+| Format | Magic | Loader | Purpose |
+| --- | --- | --- | --- |
+| NNUE visualizer model | `NNUE` | `nnue::Loader` | Compact HalfKP feature, accumulator, and output weights. |
+| LC0 CNN visualizer model | `LC0J` | `lc0_cnn::Loader` | Compact LC0-style CNN weights and policy map. |
+| BT4 real visualizer model | `BT4J` | `lc0_bt4::loadBt4Real` | CRTK BT4J v2 transformer weights. |
+| BT4 legacy visual metadata | `BT4V` | `lc0_bt4::Network::load` | Synthetic fallback dimension validation. |
+| Config | text key/value | `io::Config` | Window, assets, models, startup architecture, MCTS, clock. |
+| FEN | text | `Fen` / `FenIo` | Position import/export. |
+
+All binary model formats are little-endian.
+
+## 9. UI Layout
+
+The main window is split into:
+
+1. a left board/status area,
+2. a right command and activation panel area.
+
+When an activation architecture is selected, the activation view receives most
+of the lower right panel and the move list becomes a compact footer. When Off
+is selected, the move list fills the available right panel space. Tree mode
+replaces the whole window with a toolbar and pan/zoom tree canvas.
+
+## 10. Error Handling
+
+- Missing NNUE weights fall back to a zero-ish visual path and show status.
+- Missing CNN weights disable the real CNN path and use fallback search
+  behavior.
+- BT4 loads lazily. If the real BT4J file fails, the network remains usable via
+  the synthetic fallback.
+- Invalid FEN input remains in the dialog and displays the parse error.
+- Invalid setup-editor positions cannot be applied.
+- Search/evaluation exceptions are caught and fall back to Classical
+  evaluation where possible.
+
+## 11. Testing Strategy
+
+The automated suite covers:
+
+- bitboard helpers, piece/move encoding, legal move generation, perft,
+  make/unmake, hashing, FEN, SAN, draw/status helpers,
+- game loop, PGN export, move-history linked list, editor validation,
+- config and FEN file I/O,
+- tensor ops and activation snapshot storage,
+- NNUE, CNN, BT4 loader/forward paths and runtime model smoke tests,
+- Classical evaluator terms, WDL, and PST heatmaps,
+- MCTS invariants and forced-mate behavior,
+- top-level smoke test.
+
+The current local run on 2026-06-08 passes 151 tests with 0 failures.
+
+## 12. Intentional Limitations
+
+- Human-vs-human play only; no engine opponent mode yet.
+- FEN load/save is available; PGN import and file pickers are not implemented.
+- Compact CNN and BT4 model files are untrained visualization models, so they
+  demonstrate shape and data flow rather than playing strength.
+- Official LC0 protobuf model import is outside the current runtime scope.
+- UI tests are documented manually because the project uses an interactive
+  desktop window rather than a headless browser UI.

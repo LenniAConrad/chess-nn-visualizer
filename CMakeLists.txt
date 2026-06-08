@@ -73,6 +73,7 @@ file(GLOB_RECURSE CNNV_CORE_SRC
     src/game/*.cpp
     src/nn/*.cpp
     src/io/*.cpp
+    src/search/*.cpp
 )
 
 add_library(cnnv_core STATIC ${CNNV_CORE_SRC} ${CNNV_CUDA_SRC})

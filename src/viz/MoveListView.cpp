@@ -42,6 +42,11 @@ MoveListView::CellLayout MoveListView::rowLayout(int row) const {
 
 void MoveListView::update() {
     if (!m_game) return;
+    if (m_bounds.width <= 0.0f || m_bounds.height <= 0.0f) return;
+    if (m_game->history().size() == 0) {
+        m_scrollRows = 0;
+        return;
+    }
 
     // Scroll wheel adjusts the row offset only when the cursor is inside the
     // panel — otherwise other widgets (none yet, but BoardView later) keep
@@ -89,6 +94,8 @@ void MoveListView::update() {
 
 void MoveListView::draw(const Theme& theme) const {
     if (!m_game) return;
+    if (m_bounds.width <= 0.0f || m_bounds.height <= 0.0f) return;
+    if (m_game->history().size() == 0) return;
 
     DrawRectangleRec(m_bounds, theme.panelBackground);
     DrawRectangleLinesEx(m_bounds, 1.0f, theme.panelBorder);

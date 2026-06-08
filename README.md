@@ -1,14 +1,20 @@
 # cpp-nn-visualizer
 
-Native C++ raylib visualizer for chess neural-network activations across
-three architectures: NNUE (half-KP), LC0 CNN ResNet, and LC0 BT4
-transformer. Built as the final project for a C++ programming course; the
-same binary doubles as the Tutorial III deliverable (a complete
-human-vs-human chess game).
+`cpp-nn-visualizer` is a native C++17/raylib chess application for exploring
+chess evaluation models. It combines a legal human-vs-human chess board with
+activation views for NNUE, an LC0-style CNN, an LC0 BT4-style transformer, and
+a handcrafted Classical evaluator. The app also includes a full-screen PUCT
+search-tree workbench with mini-board nodes, principal-variation highlighting,
+and pan/zoom navigation.
 
-All chess logic and NN inference run in this repo's C++ code — no
-subprocesses to external engines or toolkits at runtime. Weight files are
-plain binary blobs loaded by `src/io/WeightFileReader`.
+The runtime is self-contained C++. It does not call external chess engines,
+Java programs, Python scripts, web services, or AI APIs while running. Model
+files are local binary blobs loaded from `models/`.
+
+The app was not made by AI. AI assistants were used only for minor support work
+such as documentation wording, debugging explanations, and review checklists;
+project design, implementation, integration, and testing remained student work.
+See [docs/ai-usage.md](docs/ai-usage.md).
 
 ## Team
 
@@ -21,126 +27,164 @@ Course requirements are archived in [Project2026.pdf](Project2026.pdf).
 
 Related prior chess work:
 
-- [LenniAConrad/chess-rtk](https://github.com/LenniAConrad/chess-rtk): Java chess research toolkit used as prior reference material for chess-domain design and selected algorithm translation.
-- [LenniAConrad/chess-web](https://github.com/LenniAConrad/chess-web): separate TypeScript web chess player/trainer used as interface and gameplay background reference.
+- [LenniAConrad/chess-rtk](https://github.com/LenniAConrad/chess-rtk):
+  Java chess research toolkit used as reference material for chess-domain
+  design and selected algorithm translation.
+- [LenniAConrad/chess-web](https://github.com/LenniAConrad/chess-web):
+  separate TypeScript chess interface used as UI and gameplay background
+  reference.
 
-## Tutorial Demo
+## Current Features
 
-![Full tutorial demo](docs/tutorial.gif)
+- Legal chess play with mouse click/drag input, legal target highlighting,
+  promotion selection, undo/redo, move history, FEN load/save, and setup
+  validation.
+- NNUE HalfKP visualization: active features, accumulators, clipped activations,
+  output contributions, learned-weight atlas, and architecture diagram.
+- LC0 CNN visualization: 112 input planes, residual stack, policy logits,
+  WDL/value head, board heatmaps, atlas, and diagram modes.
+- LC0 BT4 visualization: compact real `BT4J` v2 transformer weights, 64 square
+  tokens, multi-head attention, policy logits, WDL/value head, and attention
+  boards with live pieces.
+- Classical evaluator visualization: material/PST/activity/threat/etc.
+  breakdown, WDL triplet, game phase, and per-piece piece-square heatmaps.
+- PUCT MCTS workbench: live tree growth, top-branch filtering, transposition
+  merge display, batched leaf blobs, growth scrubber, and follow/trace mode.
+- Optional chess clock and borderless fullscreen toggle.
 
-The animated walkthrough is a 12 FPS live capture of the app. The submitted
-configuration now starts windowed with the activation panel OFF; `F11` still
-toggles borderless fullscreen for demonstrations. The walkthrough selects
-NNUE, CNN, and BT4 and shows both abstract and detailed views for each
-architecture. It also covers Reset, Flip, Undo/Redo, Random, Search, Load FEN,
-Save FEN, Setup, Edit FEN, editor sub-controls, and the native engine-style
-search preview with live depth, nodes, evaluation, and PV. The full-resolution
-MP4 version is [docs/demo.mp4](docs/demo.mp4).
+The checked-in `config.ini` starts windowed at 1280x800 with `startup.arch=cnn`
+so a model-backed panel is visible immediately. Set `startup.arch=off` for a
+quiet chess-board-only launch.
 
-## Build
+## Build On Linux
 
-Requirements: a C++17 compiler, CMake ≥ 3.20, and the system libraries
-raylib needs (X11 / OpenGL on Linux). The helper scripts default to a CPU
-build for reliability; set `CNNV_ENABLE_CUDA=ON` when running the scripts if
-you want optional CUDA tensor kernels.
-On Debian/Ubuntu:
+Requirements: a C++17 compiler, CMake 3.20 or newer, and the X11/OpenGL
+libraries required by raylib. On Debian/Ubuntu:
 
 ```bash
 sudo apt install build-essential cmake libgl1-mesa-dev libx11-dev \
     libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 ```
 
-Then:
+Build and run:
 
 ```bash
 ./scripts/build.sh
 ./scripts/run.sh
 ```
 
-`scripts/build.sh` automatically uses `~/.local/src/raylib` when that local
-raylib checkout exists. To use a different local raylib source instead, set
-`RAYLIB_SOURCE_DIR=/path/to/raylib`. Without a local source, CMake falls back
-to fetching raylib through `FetchContent`.
-
-Or manually:
+Manual equivalent:
 
 ```bash
-cmake -B build -DCNNV_ENABLE_CUDA=OFF
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCNNV_ENABLE_CUDA=OFF
 cmake --build build -j
 ./build/cnnv
 ```
 
+`scripts/build.sh` uses `~/.local/src/raylib` when that checkout exists. To use
+another local raylib source, set `RAYLIB_SOURCE_DIR=/path/to/raylib`. Without a
+local source, CMake fetches raylib 5.0 through `FetchContent`.
+
+CUDA tensor kernels are optional. The helper scripts default to CPU mode; set
+`CNNV_ENABLE_CUDA=ON` when configuring if an `nvcc` toolchain is available.
+
+## Windows Package
+
+A ready-to-run Windows x64 package is staged at:
+
+```text
+dist/cpp-nn-visualizer-windows-x64/
+```
+
+Run `run-cnnv.bat` or `run-cnnv.ps1` from that directory. The package includes
+`cnnv.exe`, `config.ini`, assets, compact runtime models, and the MinGW runtime
+DLL required by the executable.
+
 ## Model Files
 
-Populate ignored local model files with:
+The default runtime model paths are:
+
+```text
+models/nnue-halfkp-demo.bin
+models/lc0-cnn-small-112p-4x32-policy4672-wdl3.bin
+models/lc0-bt4-tiny-96x4x4h.bin
+```
+
+Populate or refresh them with:
 
 ```bash
 ./scripts/import_models.sh
 ```
 
-The importer prefers `~/Code/chess-models/models` and
-`~/Code/chess-rtk/models`, then falls back to known download URLs where
-available. Runtime model paths use a consistent `.bin` naming scheme:
-`nnue-halfkp-demo.bin`, `lc0-cnn-112p-10x128-policy4672-wdl3.bin`, and
-`lc0-bt4-1024x15x32h-visual.bin`. Optional upstream reference blobs are also
-stored with `-reference.bin` names when imported.
+The CNN and BT4 defaults are compact generated models. They are intentionally
+small enough for a teaching visualizer, but they still exercise the real native
+forward paths. The BT4 default is a `BT4J` v2 file with 96-dimensional tokens,
+4 encoder blocks, 4 attention heads, an attention policy head, and a WDL value
+head. The full official LC0 protobuf format is not a runtime dependency.
 
-For the full defense demo, these runtime files should exist before launching:
-`models/nnue-halfkp-demo.bin`,
-`models/lc0-cnn-112p-10x128-policy4672-wdl3.bin`, and
-`models/lc0-bt4-1024x15x32h-visual.bin`.
+More details are in [models/README.md](models/README.md).
 
-## Test
+## Tests
 
 ```bash
 ./scripts/test.sh
 ```
 
-Before the final defense, run the complete readiness check:
+Current local verification on 2026-06-08:
+
+```text
+ctest: 1/1 passed
+cnnv_tests: 151 passed, 0 failed
+```
+
+The broader demo/readiness check is:
 
 ```bash
 ./scripts/demo_check.sh
 ```
 
-It verifies the required documents, tutorial media, local model files,
-windowed/OFF startup config, media metadata, and automated tests.
+It checks required documents, PDF exports, tutorial media, model files,
+selected config values, media metadata when `ffprobe` is available, and the
+automated test suite.
 
 ## API Documentation
 
-Source headers use Doxygen/Javadoc-style comments (`/** ... */`) for public
-classes, functions, and important data structures. If Doxygen is installed,
-generate browsable HTML API docs with:
+Public headers use Doxygen/Javadoc-style comments. If Doxygen is installed,
+generate browsable API docs with:
 
 ```bash
 cmake --build build --target docs
 ```
 
-or directly:
+or:
 
 ```bash
 doxygen Doxyfile
 ```
 
-Generated output is written under `build/docs/doxygen/html`.
+HTML output is written under `build/docs/doxygen/html`.
 
-## Layout
+## Repository Layout
 
+```text
+src/chess/       legal-move chess core, FEN/SAN, perft, hashing
+src/chess/eval/  handcrafted Classical evaluator and PST heatmaps
+src/game/        game state, move history, PGN export
+src/io/          config, FEN files, and binary weight loading
+src/nn/          tensors, ops, activation snapshots, network interface
+src/nn/nnue/     NNUE HalfKP encoder, accumulator, and forward pass
+src/nn/lc0_cnn/  LC0J CNN loader, encoder, policy map, and forward pass
+src/nn/lc0_bt4/  BT4J loader, real forward pass, and synthetic fallback
+src/search/      PUCT MCTS engine used by the tree workbench
+src/viz/         raylib app, board, controls, views, editor, tree UI
+tests/           unit, regression, numerical, and smoke tests
+docs/            project documents, tutorial media, PDF exports
+models/          local model blobs and model-format notes
+assets/          piece sprites and other UI assets
+dist/            packaged Windows build artifacts
 ```
-src/chess/      legal-move chess core (transpiled subset of chess-rtk)
-src/game/       game state, move history (linked list), PGN export
-src/nn/         architecture-agnostic Tensor, ops, INetwork base
-src/nn/nnue/    NNUE half-KP forward pass
-src/nn/lc0_cnn/ Leela CNN ResNet forward pass
-src/nn/lc0_bt4/ Leela BT4 transformer forward pass
-src/viz/        raylib UI: boards, controls, activation views, editor
-src/io/         FEN, PGN, config, weight file loaders
-tests/          unit tests, perft, NN numerical-match tests
-docs/           design spec, user manual, test cases, summary, AI usage
-models/         weight files (not committed; see models/README.md)
-assets/         piece sprites, fonts
-```
 
-## Documents
+## Project Documents
 
 - [docs/project-proposal-requirements.md](docs/project-proposal-requirements.md)
 - [docs/design-spec.md](docs/design-spec.md)
@@ -151,10 +195,10 @@ assets/         piece sprites, fonts
 - [docs/tutorial.gif](docs/tutorial.gif)
 - [docs/demo.mp4](docs/demo.mp4)
 
-PDF exports can be regenerated with:
+Regenerate PDF exports with:
 
 ```bash
 ./scripts/export_docs.sh
 ```
 
-[TODO.md](TODO.md) is now a final submission checklist and defense prep note.
+[TODO.md](TODO.md) is kept as the final defense checklist and future-work note.

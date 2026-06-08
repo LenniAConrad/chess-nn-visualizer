@@ -27,11 +27,15 @@ public:
     /** @brief Callback invoked when a button is pressed. */
     using Callback = std::function<void()>;
 
+    /** @brief Predicate used to render a button as latched/on. */
+    using ActivePredicate = std::function<bool()>;
+
     /** @brief Removes every button. */
     void clear() noexcept { m_buttons.clear(); }
 
-    /** @brief Adds a labeled button and callback. */
-    void addButton(std::string label, Callback onPress);
+    /** @brief Adds a labeled button, callback, and optional active state. */
+    void addButton(std::string label, Callback onPress,
+                   ActivePredicate isActive = {});
 
     /** @brief Sets the command-area rectangle. */
     void setBounds(Rectangle r) noexcept { m_bounds = r; }
@@ -56,6 +60,7 @@ private:
     struct Button {
         std::string label;
         Callback onPress;
+        ActivePredicate isActive;
     };
 
     Rectangle buttonRect(std::size_t index) const;

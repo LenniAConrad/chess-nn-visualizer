@@ -4,6 +4,7 @@
 #include "nn/ActivationSnapshot.h"
 #include "nn/lc0_cnn/Lc0CnnEncoder.h"
 #include "nn/lc0_cnn/Lc0CnnLoader.h"
+#include "nn/lc0_cnn/PolicyEncoder.h"
 #include "nn/ops/Activations.h"
 #include "nn/ops/Conv2d.h"
 
@@ -135,6 +136,28 @@ Network::Network(Weights weights) : m_weights(std::move(weights)) {}
 
 void Network::load(const std::string& path) {
     m_weights = Loader::load(path);
+    m_policyReverseBuilt = false;
+}
+
+void Network::ensurePolicyReverse() const {
+    if (m_policyReverseBuilt) return;
+    m_policyReverse.assign(kRawPolicySize, -1);
+    for (std::size_t i = 0; i < m_weights.policyMap.size(); ++i) {
+        const int raw = m_weights.policyMap[i];
+        if (raw >= 0 && raw < kRawPolicySize) {
+            m_policyReverse[static_cast<std::size_t>(raw)] = static_cast<int>(i);
+        }
+    }
+    m_policyReverseBuilt = true;
+}
+
+int Network::policyIndexForMove(const cnnv::chess::Position& pos,
+                                cnnv::chess::Move move) const {
+    if (m_weights.policyMap.empty()) return -1;
+    ensurePolicyReverse();
+    const int raw = rawPolicyIndex(pos, move);
+    if (raw < 0 || raw >= static_cast<int>(m_policyReverse.size())) return -1;
+    return m_policyReverse[static_cast<std::size_t>(raw)];
 }
 
 std::string Network::name() const {

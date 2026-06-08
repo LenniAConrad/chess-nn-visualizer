@@ -1,5 +1,6 @@
 #include "TestMain.h"
 
+#include "BinaryTestWriter.h"
 #include "chess/Fen.h"
 #include "chess/Position.h"
 #include "nn/ActivationSnapshot.h"
@@ -25,6 +26,8 @@ using namespace cnnv::nn::nnue;
 
 namespace {
 
+namespace bin = cnnv_test::bin;
+
 bool approx(float a, float b, float tol = 1e-4f) {
     return std::fabs(a - b) <= tol;
 }
@@ -34,20 +37,6 @@ std::string tempPath(const char* suffix) {
     char buf[256];
     std::snprintf(buf, sizeof(buf), "/tmp/cnnv_nnue_%d_%s.bin", counter++, suffix);
     return buf;
-}
-
-void writeU32(std::ofstream& os, std::uint32_t v) {
-    os.write(reinterpret_cast<const char*>(&v), sizeof(v));
-}
-void writeF32(std::ofstream& os, float v) {
-    os.write(reinterpret_cast<const char*>(&v), sizeof(v));
-}
-void writeFloatArray(std::ofstream& os, const std::vector<float>& v) {
-    writeU32(os, static_cast<std::uint32_t>(v.size()));
-    if (!v.empty()) {
-        os.write(reinterpret_cast<const char*>(v.data()),
-                 static_cast<std::streamsize>(v.size() * sizeof(float)));
-    }
 }
 
 // Builds a minimal CRTK-format NNUE file at `path` with the given weights and
@@ -60,14 +49,14 @@ bool writeCrtkNnue(const std::string& path, int hiddenSize,
     std::ofstream os(path, std::ios::binary);
     if (!os) return false;
     os.write("NNUE", 4);
-    writeU32(os, 1);
-    writeU32(os, FeatureEncoder::kFeatureCount);
-    writeU32(os, static_cast<std::uint32_t>(hiddenSize));
-    writeF32(os, outputScale);
-    writeFloatArray(os, featureBias);
-    writeFloatArray(os, featureWeights);
-    writeFloatArray(os, outputWeights);
-    writeF32(os, outputBias);
+    bin::writeU32(os, 1);
+    bin::writeU32(os, FeatureEncoder::kFeatureCount);
+    bin::writeU32(os, static_cast<std::uint32_t>(hiddenSize));
+    bin::writeF32(os, outputScale);
+    bin::writeFloatArrayU32(os, featureBias);
+    bin::writeFloatArrayU32(os, featureWeights);
+    bin::writeFloatArrayU32(os, outputWeights);
+    bin::writeF32(os, outputBias);
     return os.good();
 }
 

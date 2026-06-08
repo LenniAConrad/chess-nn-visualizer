@@ -23,3 +23,14 @@ for doc in "${docs[@]}"; do
     -V colorlinks=true \
     -o "docs/pdf/${base}.pdf"
 done
+
+pandoc \
+  docs/project-proposal-requirements.md \
+  docs/design-spec.md \
+  docs/user-manual.md \
+  --metadata title="Final Project Report" \
+  --resource-path=.:docs \
+  --pdf-engine=xelatex \
+  -V geometry:margin=1in \
+  -V colorlinks=true \
+  -o docs/pdf/final-project-report.pdf

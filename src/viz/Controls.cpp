@@ -8,10 +8,20 @@ constexpr float kButtonHeight = 36.0f;
 constexpr float kButtonSpacing = 6.0f;
 constexpr float kPanelPadding = 10.0f;
 
+Color blendColor(Color a, Color b, float t) noexcept {
+    const auto mix = [t](unsigned char av, unsigned char bv) {
+        return static_cast<unsigned char>(static_cast<float>(av)
+            + (static_cast<float>(bv) - static_cast<float>(av)) * t);
+    };
+    return Color{mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b), mix(a.a, b.a)};
+}
+
 }  // namespace
 
-void Controls::addButton(std::string label, Callback onPress) {
-    m_buttons.push_back({std::move(label), std::move(onPress)});
+void Controls::addButton(std::string label, Callback onPress,
+                         ActivePredicate isActive) {
+    m_buttons.push_back({std::move(label), std::move(onPress),
+                         std::move(isActive)});
 }
 
 Rectangle Controls::buttonRect(std::size_t index) const {
@@ -61,11 +71,26 @@ void Controls::update() {
 void Controls::draw(const Theme& theme) const {
     for (std::size_t i = 0; i < m_buttons.size(); ++i) {
         Rectangle r = buttonRect(i);
+        const bool latched =
+            m_buttons[i].isActive && m_buttons[i].isActive();
+        const bool hovered = static_cast<int>(i) == m_hoverIndex;
+        const bool pressed = static_cast<int>(i) == m_pressedIndex;
         Color fill = theme.buttonIdle;
-        if (static_cast<int>(i) == m_pressedIndex) fill = theme.buttonActive;
-        else if (static_cast<int>(i) == m_hoverIndex) fill = theme.buttonHover;
+        if (latched) {
+            fill = blendColor(hovered ? theme.buttonHover : theme.buttonActive,
+                              theme.accentGreen, 0.42f);
+        } else if (pressed) {
+            fill = theme.buttonActive;
+        } else if (hovered) {
+            fill = theme.buttonHover;
+        }
         DrawRectangleRec(r, fill);
-        DrawRectangleLinesEx(r, 1.0f, theme.panelBorder);
+        DrawRectangleLinesEx(r, latched ? 2.0f : 1.0f,
+                             latched ? theme.accentGreen : theme.panelBorder);
+        if (latched) {
+            DrawRectangleRec(Rectangle{r.x, r.y, 4.0f, r.height},
+                             theme.accentGreen);
+        }
         const char* text = m_buttons[i].label.c_str();
         int fontSize = 17;
         int textWidth = measureText(theme, text, fontSize);

@@ -5,6 +5,8 @@
 #include "chess/Position.h"
 #include "io/WeightFileReader.h"
 #include "nn/ActivationSnapshot.h"
+#include "nn/lc0_bt4/Bt4BinLoader.h"
+#include "nn/lc0_bt4/Bt4RealForward.h"
 #include "nn/lc0_cnn/Lc0CnnEncoder.h"
 #include "nn/ops/Activations.h"
 #include "nn/ops/Attention.h"
@@ -13,6 +15,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <fstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -372,6 +376,26 @@ std::vector<float> boardValueSalience(const std::vector<float>& tokens,
 }  // namespace
 
 void Network::load(const std::string& path) {
+    // Peek the 4-byte magic to choose the real (BT4J) vs synthetic (BT4V) path.
+    char magic[4] = {0, 0, 0, 0};
+    {
+        std::ifstream probe(path, std::ios::binary);
+        if (!probe) {
+            throw std::runtime_error("Bt4Network: cannot open " + path);
+        }
+        probe.read(magic, 4);
+    }
+    if (std::memcmp(magic, "BT4J", 4) == 0) {
+        std::string error;
+        if (!loadBt4Real(path, m_realWeights, error)) {
+            m_realLoaded = false;
+            throw std::runtime_error("Bt4Network: " + error);
+        }
+        m_realLoaded = true;
+        return;
+    }
+
+    m_realLoaded = false;
     cnnv::io::WeightFileReader r;
     r.open(path, "BT4V");
 
@@ -395,7 +419,7 @@ void Network::load(const std::string& path) {
         tokens != static_cast<std::uint32_t>(kTokens) ||
         tokenWidth != static_cast<std::uint32_t>(kTokenWidth) ||
         modelDim != static_cast<std::uint32_t>(kModelDim) ||
-        blocks != static_cast<std::uint32_t>(kBlocks) ||
+        blocks != static_cast<std::uint32_t>(kSyntheticBlocks) ||
         heads != static_cast<std::uint32_t>(kHeads) ||
         policySize != static_cast<std::uint32_t>(kPolicySize)) {
         throw std::runtime_error(
@@ -409,6 +433,10 @@ void Network::load(const std::string& path) {
 
 void Network::evaluate(const chess::Position& pos,
                        ActivationSnapshot& out) const {
+    if (m_realLoaded) {
+        evaluateBt4Real(m_realWeights, pos, out);
+        return;
+    }
     std::vector<float> planes = lc0_cnn::Encoder::encode(pos);
     out.store(snapshot_keys::kInputPlanes, {kInputChannels, 8, 8},
               planes.data());
@@ -421,7 +449,7 @@ void Network::evaluate(const chess::Position& pos,
     out.store(snapshot_keys::kEmbedding, {kTokens, kModelDim}, flow.data());
 
     std::vector<float> q, k, v, attended, attentionWeights, attnOut, ffn;
-    for (int block = 0; block < kBlocks; ++block) {
+    for (int block = 0; block < kSyntheticBlocks; ++block) {
         std::vector<float> ln1 = layerNorm(flow);
         out.store(snapshot_keys::blockLn1Key(block), {kTokens, kModelDim},
                   ln1.data());

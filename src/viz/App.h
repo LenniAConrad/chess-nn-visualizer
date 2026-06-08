@@ -14,6 +14,7 @@
 #include "nn/nnue/NnueNetwork.h"
 #include "viz/BoardView.h"
 #include "viz/Bt4View.h"
+#include "viz/ClassicalView.h"
 #include "viz/Controls.h"
 #include "viz/CnnView.h"
 #include "viz/EditorMode.h"
@@ -25,6 +26,8 @@
 #include "viz/PieceSprites.h"
 #include "viz/PromotionPicker.h"
 #include "viz/Theme.h"
+#include "viz/TreeView.h"
+#include "search/Mcts.h"
 
 #include <atomic>
 #include <array>
@@ -36,7 +39,9 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace cnnv::viz {
 
@@ -73,10 +78,10 @@ private:
     /**
      * @brief Neural-network architecture selected for activation rendering.
      */
-    enum class Arch { Nnue, Cnn, Bt4, Off };
+    enum class Arch { Nnue, Cnn, Bt4, Classical, Off };
 
     /** @brief Number of architecture selector buttons. */
-    static constexpr std::size_t kArchCount = 4;
+    static constexpr std::size_t kArchCount = 5;
 
     /**
      * @brief Result object returned from an asynchronous network evaluation.
@@ -219,6 +224,18 @@ private:
     /** @brief Draws the architecture selector tabs. */
     void drawArchitectureSelector() const;
 
+    /** @brief Builds the raylib 2D camera for the activation panel. */
+    Camera2D activationPanelCamera() const noexcept;
+
+    /** @brief Zooms the activation panel about a screen-space anchor. */
+    void zoomActivationPanel(Vector2 anchor, float factor) noexcept;
+
+    /** @brief Resets the activation-panel camera to identity. */
+    void resetActivationPanelCamera() noexcept;
+
+    /** @brief Processes zoom/pan/keyboard input for the activation panel. */
+    void handleActivationPanelCameraInput();
+
     /** @brief Mutable active activation view, or null when disabled. */
     IActivationView* activeActivationView() noexcept;
 
@@ -284,8 +301,24 @@ private:
     std::unique_ptr<NnueView> m_nnueView;
     std::unique_ptr<CnnView> m_cnnView;
     std::unique_ptr<Bt4View> m_bt4View;
+    std::unique_ptr<ClassicalView> m_classicalView;
+    std::unique_ptr<TreeView> m_treeView;
     std::array<Rectangle, kArchCount> m_archButtons{};
+    Rectangle m_treeTabButton{0, 0, 0, 0};  // "Tree" tab in the view selector
     Rectangle m_activationPanelBounds{0, 0, 0, 0};
+
+    /**
+     * @brief Zoom/pan camera for the activation panel only.
+     *
+     * Replicates chess-rtk's tree-view camera: wheel zoom-to-cursor (factor
+     * 1.12, clamp 0.01..8.0), right/middle-drag pan (1:1), and reset to
+     * identity. Identity (zoom 1, pan 0) renders the view exactly in its panel
+     * bounds. Board, controls, and move list stay in plain screen space.
+     */
+    float m_panelZoom = 1.0f;
+    Vector2 m_panelPan{0.0f, 0.0f};
+    bool m_panelPanning = false;
+    Vector2 m_panelPanLastMouse{0.0f, 0.0f};
 
     EditorMode m_editor;
     std::unique_ptr<EditorPalette> m_editorPalette;
@@ -320,6 +353,8 @@ private:
     cnnv::nn::lc0_cnn::Network m_cnn;
     cnnv::nn::lc0_bt4::Network m_bt4;
     bool m_cnnLoaded = false;
+    bool m_bt4LoadAttempted = false;  // small BT4 loads instantly on first use
+    std::string m_bt4Path;
     Arch m_arch = Arch::Nnue;
 
     bool m_clockEnabled = false;
@@ -393,14 +428,49 @@ private:
     /** @brief Attempts to load CNN weights and records user-facing status. */
     bool tryLoadCnn(const std::string& path);
 
-    /** @brief Attempts to load BT4 visual-model metadata. */
+    /** @brief Attempts to load BT4 weights (real BT4J or synthetic metadata). */
     bool tryLoadBt4(const std::string& path);
+
+    /** @brief Lazily loads the (large) BT4 model on first use. */
+    void ensureBt4Loaded();
 
     /** @brief Cycles to the next available architecture. */
     void cycleArchitecture();
 
     /** @brief Short architecture label for UI text. */
     const char* archName(Arch a) const noexcept;
+
+    /** @brief Per-architecture signature color used for selector/view chrome. */
+    Color archSignature(Arch a) const noexcept;
+
+    /** @brief Enters the full-window MCTS search-tree screen. */
+    void enterTreeMode();
+
+    /** @brief Leaves the tree screen (and stops any running search). */
+    void leaveTreeMode();
+
+    /** @brief Starts an MCTS search from the current position. */
+    void startMcts();
+
+    /** @brief Signals the MCTS worker to stop and joins it. */
+    void stopMcts();
+
+    /** @brief Background MCTS worker loop. */
+    void mctsWorker();
+
+    /** @brief Leaf evaluator used by MCTS: selected-arch value + priors. */
+    cnnv::search::LeafEval mctsEvaluate(const cnnv::chess::Position& pos,
+                                        const cnnv::chess::MoveList& legal,
+                                        Arch arch) const;
+
+    /** @brief Lays out the tree-screen toolbar and view rectangles. */
+    void layoutTree();
+
+    /** @brief Draws the tree-screen toolbar + visualizer. */
+    void drawTreeScreen();
+
+    /** @brief Handles input for the tree screen. */
+    void handleTreeInput();
 
     bool m_fontsLoaded = false;
 
@@ -415,6 +485,39 @@ private:
     Arch m_evalFailedArch = Arch::Nnue;
     std::string m_evalError;
     float m_activationFade = 1.0f;
+
+    // --- MCTS search-tree workbench ---
+    bool m_treeMode = false;
+    std::unique_ptr<cnnv::search::Mcts> m_mcts;
+    std::thread m_mctsThread;
+    std::atomic<bool> m_mctsStop{false};
+    std::atomic<bool> m_mctsPaused{false};
+    std::atomic<bool> m_mctsRunning{false};
+    mutable std::mutex m_mctsMutex;
+    cnnv::search::Snapshot m_mctsSnapshot;
+    std::vector<cnnv::search::Snapshot> m_mctsFrames;  // growth history (scrubber)
+    long m_mctsAppliedPlayouts = -1;
+
+    // Playback scrubber over recorded growth frames.
+    bool m_treeScrubbing = false;
+    bool m_scrubPlaying = false;
+    int m_scrubIndex = 0;
+    int m_scrubAppliedIndex = -1;
+    double m_scrubNextAdvance = 0.0;
+    int m_mctsVisitBudget = 20000;
+    // chess-rtk's shipped PUCT default.
+    double m_mctsCpuct = 2.8;
+    Rectangle m_treeToolbar{0, 0, 0, 0};
+    // start stop exit fit v- v+ c- c+ follow branch- branch+ batch guides
+    // depth- depth+ merge
+    std::array<Rectangle, 16> m_treeButtons{};
+    std::string m_treeSelInfo;
+    bool m_mctsFollow = false;
+
+    // When set, the network views and MCTS root use this position instead of the
+    // live board. Set by selecting a tree node or follow-leaf; cleared on any
+    // board change. This is the "trace" link from the search tree to the views.
+    std::optional<cnnv::chess::Position> m_evalOverride;
 
     std::future<void> m_searchFuture;
     std::atomic<bool> m_searchCancel{false};

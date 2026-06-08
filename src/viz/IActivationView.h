@@ -43,6 +43,18 @@ class IActivationView {
 
     /** @brief Short label for the architecture switcher. */
     virtual std::string name() const = 0;
+
+    /**
+     * @brief Sets this view's per-architecture signature color.
+     *
+     * Used for the header accent strip, mode-toggle active segment, and
+     * selection highlights so each architecture is visually distinct.
+     */
+    virtual void setSignature(Color c) { m_signature = c; }
+
+   protected:
+    /** @brief Per-architecture signature color (neutral by default). */
+    Color m_signature = Color{140, 144, 152, 255};
 };
 
 }  // namespace cnnv::viz

@@ -8,6 +8,9 @@ namespace cnnv::viz::tensorviz {
 
 namespace {
 
+Camera2D g_activeCamera{};
+bool g_hasActiveCamera = false;
+
 struct GridSpec {
     int rows = 1;
     int cols = 1;
@@ -195,29 +198,6 @@ void drawStatsBadges(Rectangle bounds,
     }
 }
 
-std::string fitText(const Theme& theme,
-                    std::string text,
-                    int fontSize,
-                    bool mono,
-                    float maxWidth) {
-    if (maxWidth <= 1.0f || text.empty()) return "";
-    auto measure = [&]() {
-        return mono ? measureTextMono(theme, text.c_str(), fontSize)
-                    : measureText(theme, text.c_str(), fontSize);
-    };
-    if (measure() <= static_cast<int>(maxWidth)) return text;
-
-    const std::string ellipsis = "...";
-    while (!text.empty()) {
-        text.pop_back();
-        std::string candidate = text + ellipsis;
-        const int w = mono ? measureTextMono(theme, candidate.c_str(), fontSize)
-                           : measureText(theme, candidate.c_str(), fontSize);
-        if (w <= static_cast<int>(maxWidth)) return candidate;
-    }
-    return ellipsis;
-}
-
 }  // namespace
 
 TensorStats computeStats(const std::vector<float>& values) {
@@ -245,6 +225,90 @@ TensorStats computeStats(const std::vector<float>& values) {
     return stats;
 }
 
+float maxAbs(const std::vector<float>& values) {
+    float m = 0.0f;
+    for (float v : values) m = std::max(m, std::fabs(v));
+    return m;
+}
+
+const char* squareName(int square) {
+    static const char* names[] = {
+        "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
+        "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
+        "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+        "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
+        "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+        "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
+        "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+        "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
+    };
+    return (square >= 0 && square < 64) ? names[square] : "??";
+}
+
+std::string fitText(const Theme& theme,
+                    std::string text,
+                    int fontSize,
+                    bool mono,
+                    float maxWidth) {
+    if (maxWidth <= 1.0f || text.empty()) return "";
+    auto measure = [&]() {
+        return mono ? measureTextMono(theme, text.c_str(), fontSize)
+                    : measureText(theme, text.c_str(), fontSize);
+    };
+    if (measure() <= static_cast<int>(maxWidth)) return text;
+
+    const std::string ellipsis = "...";
+    while (!text.empty()) {
+        text.pop_back();
+        std::string candidate = text + ellipsis;
+        const int w = mono ? measureTextMono(theme, candidate.c_str(), fontSize)
+                           : measureText(theme, candidate.c_str(), fontSize);
+        if (w <= static_cast<int>(maxWidth)) return candidate;
+    }
+    return ellipsis;
+}
+
+Rectangle lerfSquare(Rectangle board, int square, bool whiteDown) {
+    const int file = square & 7;
+    const int rank = square >> 3;
+    const int col = whiteDown ? file : 7 - file;
+    const int drawRank = whiteDown ? 7 - rank : rank;
+    const float cw = board.width / 8.0f;
+    const float ch = board.height / 8.0f;
+    return Rectangle{board.x + static_cast<float>(col) * cw,
+                     board.y + static_cast<float>(drawRank) * ch, cw, ch};
+}
+
+void drawMiniBoard(Rectangle board, const Theme& theme) {
+    for (int sq = 0; sq < 64; ++sq) {
+        const Rectangle cell = lerfSquare(board, sq);
+        const int file = sq & 7;
+        const int rank = sq >> 3;
+        const bool light = ((file + rank) & 1) != 0;
+        DrawRectangleRec(cell, light ? theme.squareLight : theme.squareDark);
+    }
+    DrawRectangleLinesEx(board, 1.0f, theme.panelBorder);
+}
+
+void drawCenteredText(const Theme& theme,
+                      const char* text,
+                      Rectangle bounds,
+                      int fontSize,
+                      Color color,
+                      bool mono) {
+    const int w = mono ? measureTextMono(theme, text, fontSize)
+                       : measureText(theme, text, fontSize);
+    const int x = static_cast<int>(
+        bounds.x + (bounds.width - static_cast<float>(w)) * 0.5f);
+    const int y = static_cast<int>(
+        bounds.y + (bounds.height - static_cast<float>(fontSize)) * 0.5f);
+    if (mono) {
+        drawTextMono(theme, text, x, y, fontSize, color);
+    } else {
+        drawText(theme, text, x, y, fontSize, color);
+    }
+}
+
 Color blend(Color a, Color b, float t) {
     t = clamp01(t);
     auto mix = [t](unsigned char x, unsigned char y) {
@@ -267,33 +331,55 @@ Color signedColor(float value, float scale, const Theme& theme) {
     return blend(zero, theme.overlayHot, t);
 }
 
+void setActiveCamera(const Camera2D& camera) {
+    g_activeCamera = camera;
+    g_hasActiveCamera = true;
+}
+
+void clearActiveCamera() {
+    g_hasActiveCamera = false;
+}
+
+Vector2 panelMousePosition() {
+    if (!g_hasActiveCamera) return GetMousePosition();
+    return GetScreenToWorld2D(GetMousePosition(), g_activeCamera);
+}
+
 void drawSectionHeader(Rectangle bounds,
                        const char* title,
                        const char* detail,
-                       const Theme& theme) {
+                       const Theme& theme,
+                       Color accent) {
     DrawRectangleRec(bounds, withAlpha(theme.panelBackground, 240));
     DrawRectangleLinesEx(bounds, 1.0f, theme.panelBorder);
+    const bool hasAccent = accent.a != 0;
+    const float textLeft = hasAccent ? 14.0f : 9.0f;
+    if (hasAccent) {
+        DrawRectangleRec(Rectangle{bounds.x, bounds.y, 4.0f, bounds.height},
+                         accent);
+    }
     const std::string titleText =
-        fitText(theme, title ? title : "", 15, false, bounds.width - 18.0f);
+        fitText(theme, title ? title : "", 15, false, bounds.width - textLeft - 9.0f);
     drawText(theme, titleText.c_str(),
-             static_cast<int>(bounds.x + 9.0f),
+             static_cast<int>(bounds.x + textLeft),
              static_cast<int>(bounds.y + 6.0f),
              15, theme.textPrimary);
     if (detail && detail[0] != '\0') {
         const std::string detailText =
-            fitText(theme, detail, 11, true, bounds.width - 18.0f);
+            fitText(theme, detail, 11, true, bounds.width - textLeft - 9.0f);
         drawTextMono(theme, detailText.c_str(),
-                     static_cast<int>(bounds.x + 9.0f),
+                     static_cast<int>(bounds.x + textLeft),
                      static_cast<int>(bounds.y + 26.0f),
                      11, theme.textMuted);
     }
 }
 
-bool drawModeToggle(Rectangle bounds, bool detailed, const Theme& theme) {
+bool drawModeToggle(Rectangle bounds, bool detailed, const Theme& theme,
+                    Color accent) {
     const Rectangle left{bounds.x, bounds.y, bounds.width * 0.5f, bounds.height};
     const Rectangle right{bounds.x + bounds.width * 0.5f, bounds.y,
                           bounds.width * 0.5f, bounds.height};
-    const Vector2 mouse = GetMousePosition();
+    const Vector2 mouse = panelMousePosition();
     bool next = detailed;
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (CheckCollisionPointRec(mouse, left)) next = false;
@@ -301,7 +387,10 @@ bool drawModeToggle(Rectangle bounds, bool detailed, const Theme& theme) {
     }
 
     DrawRectangleRec(bounds, withAlpha(theme.buttonIdle, 225));
-    DrawRectangleRec(next ? right : left, theme.buttonActive);
+    const Color activeFill =
+        accent.a != 0 ? blend(theme.buttonActive, accent, 0.55f)
+                      : theme.buttonActive;
+    DrawRectangleRec(next ? right : left, activeFill);
     if (CheckCollisionPointRec(mouse, left) || CheckCollisionPointRec(mouse, right)) {
         DrawRectangleRec(CheckCollisionPointRec(mouse, right) ? right : left,
                          withAlpha(theme.buttonHover, 155));
@@ -324,6 +413,91 @@ bool drawModeToggle(Rectangle bounds, bool detailed, const Theme& theme) {
              static_cast<int>(right.x + (right.width - static_cast<float>(w)) * 0.5f),
              static_cast<int>(right.y + (right.height - 15.0f) * 0.5f),
              size, next ? theme.textPrimary : theme.textMuted);
+    return next;
+}
+
+int drawModeSwitcher5(Rectangle bounds, int mode, Color accent,
+                      const Theme& theme) {
+    static const char* labels[5] = {"Overview", "Trace", "All", "Atlas",
+                                    "Diagram"};
+    const float segW = bounds.width / 5.0f;
+    const Vector2 mouse = panelMousePosition();
+    int next = std::clamp(mode, 0, 4);
+    DrawRectangleRec(bounds, withAlpha(theme.buttonIdle, 225));
+    for (int i = 0; i < 5; ++i) {
+        const Rectangle seg{bounds.x + segW * static_cast<float>(i), bounds.y,
+                            segW, bounds.height};
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+            CheckCollisionPointRec(mouse, seg)) {
+            next = i;
+        }
+    }
+    const Rectangle activeSeg{bounds.x + segW * static_cast<float>(next), bounds.y,
+                              segW, bounds.height};
+    const Color activeFill = accent.a != 0
+                                 ? blend(theme.buttonActive, accent, 0.55f)
+                                 : theme.buttonActive;
+    DrawRectangleRec(activeSeg, activeFill);
+    for (int i = 0; i < 5; ++i) {
+        const Rectangle seg{bounds.x + segW * static_cast<float>(i), bounds.y,
+                            segW, bounds.height};
+        if (CheckCollisionPointRec(mouse, seg) && i != next) {
+            DrawRectangleRec(seg, withAlpha(theme.buttonHover, 150));
+        }
+        if (i != 0) {
+            DrawLineV(Vector2{seg.x, seg.y}, Vector2{seg.x, seg.y + seg.height},
+                      theme.panelBorder);
+        }
+        const int w = measureText(theme, labels[i], 11);
+        drawText(theme, labels[i],
+                 static_cast<int>(seg.x + (seg.width - static_cast<float>(w)) * 0.5f),
+                 static_cast<int>(seg.y + (seg.height - 13.0f) * 0.5f), 11,
+                 i == next ? theme.textPrimary : theme.textMuted);
+    }
+    DrawRectangleLinesEx(bounds, 1.0f, theme.panelBorder);
+    return next;
+}
+
+int drawModeSelector(Rectangle bounds, int mode, const Theme& theme,
+                     Color accent) {
+    const char* labels[3] = {"abstract", "detailed", "diagram"};
+    const float segW = bounds.width / 3.0f;
+    const Vector2 mouse = panelMousePosition();
+    int next = mode < 0 ? 0 : (mode > 2 ? 2 : mode);
+
+    DrawRectangleRec(bounds, withAlpha(theme.buttonIdle, 225));
+    for (int i = 0; i < 3; ++i) {
+        const Rectangle seg{bounds.x + segW * static_cast<float>(i), bounds.y,
+                            segW, bounds.height};
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+            CheckCollisionPointRec(mouse, seg)) {
+            next = i;
+        }
+    }
+    const Rectangle activeSeg{bounds.x + segW * static_cast<float>(next), bounds.y,
+                              segW, bounds.height};
+    const Color activeFill =
+        accent.a != 0 ? blend(theme.buttonActive, accent, 0.55f)
+                      : theme.buttonActive;
+    DrawRectangleRec(activeSeg, activeFill);
+    for (int i = 0; i < 3; ++i) {
+        const Rectangle seg{bounds.x + segW * static_cast<float>(i), bounds.y,
+                            segW, bounds.height};
+        if (CheckCollisionPointRec(mouse, seg) && i != next) {
+            DrawRectangleRec(seg, withAlpha(theme.buttonHover, 150));
+        }
+        if (i != 0) {
+            DrawLineV(Vector2{seg.x, seg.y}, Vector2{seg.x, seg.y + seg.height},
+                      theme.panelBorder);
+        }
+        const int size = 12;
+        const int w = measureText(theme, labels[i], size);
+        drawText(theme, labels[i],
+                 static_cast<int>(seg.x + (seg.width - static_cast<float>(w)) * 0.5f),
+                 static_cast<int>(seg.y + (seg.height - 14.0f) * 0.5f), size,
+                 i == next ? theme.textPrimary : theme.textMuted);
+    }
+    DrawRectangleLinesEx(bounds, 1.0f, theme.panelBorder);
     return next;
 }
 

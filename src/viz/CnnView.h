@@ -3,6 +3,10 @@
 /**
  * @file CnnView.h
  * @brief Activation panel for LC0 CNN snapshots.
+ *
+ * Transpiled from chess-rtk's CnnView.java (engine-lab network view). Mirrors
+ * the five crtk paint modes via a self-drawn 5-segment switcher:
+ *   Overview (ABSTRACT) | Trace (DETAILED) | All (RAW) | Atlas | Diagram.
  */
 
 #include "viz/IActivationView.h"
@@ -51,18 +55,22 @@ public:
 
 private:
     Rectangle m_bounds{0, 0, 0, 0};
-    std::vector<float> m_heatmap;
-    std::vector<float> m_policyLogits;
+    std::vector<float> m_finalMap;      ///< cnn.final.relu_mean [64].
+    std::vector<float> m_policyLogits;  ///< cnn.policy.logits [P].
     std::vector<std::pair<int, float>> m_topPolicy;
     std::vector<LayerStat> m_layers;
     float m_wdl[3] = {0.0f, 0.0f, 0.0f};
     float m_valueScalar = 0.0f;
     int m_blockCount = 0;
-    bool m_hasHeatmap = false;
+    bool m_hasFinalMap = false;
     bool m_hasWdl = false;
     bool m_hasPolicy = false;
-    mutable bool m_detailed = false;
-    mutable int m_selectedLayer = -1;
+
+    // Mutable cursors updated during const draw() (mirrors crtk's mutable
+    // selection fields that live on the Swing component).
+    mutable int m_mode = 0;          ///< 0=Overview 1=Trace 2=All 3=Atlas 4=Diagram.
+    mutable int m_selectedLayer = -1;  ///< Trace-mode focused layer.
+    mutable int m_rawZoomLayer = -1;   ///< All-mode zoomed spatial layer, -1 = atlas.
 };
 
 }  // namespace cnnv::viz

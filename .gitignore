@@ -1,5 +1,8 @@
 # Build directories and CMake output
 /build/
+/build-windows/
+/build-win/
+/build-mingw/
 /out/
 /cmake-build-*/
 /CMakeFiles/
@@ -24,6 +27,9 @@
 *.lib
 *.pdb
 *.ilk
+
+# Generated release/package bundles
+/dist/
 
 # Neural-network model blobs are large/local runtime inputs.
 # Keep models/README.md and models/.gitkeep tracked.

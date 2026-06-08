@@ -6,6 +6,7 @@
  */
 
 #include "nn/INetwork.h"
+#include "nn/lc0_bt4/Bt4RealWeights.h"
 
 #include <string>
 
@@ -60,8 +61,8 @@ class Network : public INetwork {
     /** @brief Transformer model dimension. */
     static constexpr int kModelDim = 64;
 
-    /** @brief Number of transformer blocks. */
-    static constexpr int kBlocks = 15;
+    /** @brief Transformer blocks in the deterministic synthetic fallback. */
+    static constexpr int kSyntheticBlocks = 15;
 
     /** @brief Number of attention heads per block. */
     static constexpr int kHeads = 8;
@@ -88,13 +89,23 @@ class Network : public INetwork {
     /**
      * @brief Display name for the architecture selector.
      */
-    std::string name() const override { return "BT4 native token transformer"; }
+    std::string name() const override {
+        return m_realLoaded ? "BT4 transformer (real weights)"
+                            : "BT4 native token transformer";
+    }
 
     /**
-     * @brief Always true because this backend has deterministic built-in
-     * weights.
+     * @brief Always true: real weights when loaded, deterministic built-in
+     * weights otherwise.
      */
     bool isLoaded() const noexcept { return true; }
+
+    /** @brief True when real BT4J weights are loaded (vs the synthetic path). */
+    bool hasRealWeights() const noexcept { return m_realLoaded; }
+
+   private:
+    bool m_realLoaded = false;
+    Bt4RealWeights m_realWeights;
 };
 
 }  // namespace cnnv::nn::lc0_bt4

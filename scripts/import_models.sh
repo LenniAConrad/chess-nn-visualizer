@@ -129,60 +129,49 @@ print(f"[generate] {dest} ({dest.stat().st_size} bytes)")
 PY
 }
 
-generate_demo_bt4() {
+generate_small_bt4() {
+  # Generates a compact, real-architecture BT4J transformer that the
+  # native BT4 forward pass runs. We deliberately do NOT ship chess-rtk's full
+  # 706 MB 1024x15x32h net — it is far too large for a visualizer.
   local dest="$1"
   if [[ -e "$dest" && "$force" != "1" ]]; then
-    printf '[skip] compatible BT4 visual metadata already exists: %s\n' "$dest"
+    printf '[skip] small BT4 already exists: %s\n' "$dest"
     return 0
   fi
+  python3 scripts/generate_small_bt4.py "$dest"
+}
 
-  python3 - "$dest" <<'PY'
-import pathlib
-import struct
-import sys
+generate_tiny_bt4() {
+  local dest="$1"
+  if [[ -e "$dest" && "$force" != "1" ]]; then
+    printf '[skip] tiny BT4 already exists: %s\n' "$dest"
+    return 0
+  fi
+  BT4_NAME=bt4-tiny-96x4x4h \
+  BT4_D=96 \
+  BT4_BLOCKS=4 \
+  BT4_HEADS=4 \
+  BT4_FFN=192 \
+  BT4_POLICY_EMB=48 \
+  BT4_POLICY_DMODEL=48 \
+  BT4_VALUE_EMB=24 \
+  BT4_VALUE_HIDDEN=96 \
+  BT4_SEED=20260608 \
+    python3 scripts/generate_small_bt4.py "$dest"
+}
 
-dest = pathlib.Path(sys.argv[1])
-payload = (
-    b"BT4V" +
-    struct.pack("<IIIIIIIII",
-                1,      # version
-                112,    # input channels
-                64,     # board tokens
-                176,    # token width
-                64,     # model dim used by the C++ visualizer
-                15,     # transformer blocks
-                8,      # attention heads
-                1858,   # LC0 compressed policy size
-                0x43504E56)  # deterministic visual seed
-)
-dest.write_bytes(payload)
-print(f"[generate] {dest} ({dest.stat().st_size} bytes)")
-PY
+generate_small_cnn() {
+  local dest="$1"
+  if [[ -e "$dest" && "$force" != "1" ]]; then
+    printf '[skip] small CNN already exists: %s\n' "$dest"
+    return 0
+  fi
+  python3 scripts/generate_small_cnn.py "$dest"
 }
 
 generate_demo_nnue "$model_dir/nnue-halfkp-demo.bin"
-generate_demo_bt4 "$model_dir/lc0-bt4-1024x15x32h-visual.bin"
-
-install_file \
-  "Stockfish NNUE reference archive" \
-  "$model_dir/stockfish-nnue-f68ec79f0fe3-reference.bin" \
-  "https://tests.stockfishchess.org/api/nn/nn-f68ec79f0fe3.nnue" \
-  "stockfish-nnue-f68ec79f0fe3-reference.bin" \
-  "nn-f68ec79f0fe3.nnue" || true
-
-install_file \
-  "LC0J small CNN" \
-  "$model_dir/lc0-cnn-112p-10x128-policy4672-wdl3.bin" \
-  "" \
-  "lc0-cnn-112p-10x128-policy4672-wdl3.bin" \
-  "leela_112planes-10blocksx128-policyhead80-valuehead32-policy4672-wdl3.bin" || true
-
-install_file \
-  "LC0 BT4 protobuf reference archive" \
-  "$model_dir/lc0-bt4-1024x15x32h-policytune-reference.bin" \
-  "https://storage.lczero.org/files/networks-contrib/BT4-1024x15x32h-swa-6147500-policytune-332.pb.gz" \
-  "lc0-bt4-1024x15x32h-policytune-reference.bin" \
-  "BT4-1024x15x32h-swa-6147500-policytune-332.pb.gz" || true
+generate_small_cnn "$model_dir/lc0-cnn-small-112p-4x32-policy4672-wdl3.bin"
+generate_tiny_bt4 "$model_dir/lc0-bt4-tiny-96x4x4h.bin"
 
 printf '\nImported model files:\n'
 find "$model_dir" -maxdepth 1 \( -type f -o -type l \) | sort | while read -r path; do

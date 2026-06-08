@@ -1,95 +1,107 @@
-# Project Proposal and Requirements Analysis Report
+# Project Proposal And Requirements Analysis
 
-## 1. Team information
+## 1. Team Information
 
 | Name | Student number | Main responsibilities |
 | --- | --- | --- |
-| Lennart Axel Conrad | 2025080264 | Chess-domain architecture, Java-to-C++ translation of chess and neural-network ideas from prior projects, C++ core implementation, tests, model/data validation, documentation integration. |
-| Erik Mkrtchyan | 2025080273 | Raylib interaction workflows, visual layout and activation presentation, manual UI testing, tutorial/demo preparation, user-facing documentation review. |
+| Lennart Axel Conrad | 2025080264 | Chess-domain architecture, C++ core implementation, neural-network/evaluator paths, tests, model validation, build/package work, documentation integration. |
+| Erik Mkrtchyan | 2025080273 | raylib interaction workflows, visual layout review, activation presentation, manual UI testing, tutorial/demo preparation, user-facing documentation review. |
 
-Both members participate in the final demo and must be able to explain the
-source code, build process, major classes, and testing evidence.
+Both team members should be able to explain the build process, major classes,
+source layout, runtime workflow, tests, and final demo behavior.
 
-## 2. Project topic
+## 2. Project Topic
 
 The project is a native C++ chess neural-network visualizer. It combines a
-complete human-vs-human legal chess board with visualization panels for three
-neural-network architecture families:
+complete legal human-vs-human chess board with visualization panels for:
 
-- NNUE half-KP style accumulator and clipped output path.
-- LC0-style convolutional residual network with board planes, trunk, policy,
-  and WDL/value summaries.
-- BT4-style token transformer visualization with token, attention, FFN, policy,
-  and value views.
+- NNUE HalfKP accumulator evaluation,
+- LC0-style CNN residual evaluation,
+- LC0 BT4-style token-transformer evaluation,
+- handcrafted Classical evaluation.
 
-The topic fits the free-choice project requirement and is intentionally more
-advanced than a basic chess game because it includes move legality, notation,
-file I/O, model loading, tensor operations, tests, and real-time visualization.
+It also includes a native PUCT MCTS search-tree workbench. The topic is more
+advanced than a basic chess game because it includes legal move generation,
+notation, file I/O, binary model loading, tensor operations, search, tests, and
+real-time visualization.
 
-## 3. Related prior work
+## 3. Prior Work Used As Reference
 
-The project uses the authors' prior chess programming experience as reference
-material, but the submitted runtime is C++:
+The submitted runtime is C++. Prior personal chess projects were used as
+reference material only:
 
-- `https://github.com/LenniAConrad/chess-rtk` is a Java chess research toolkit
-  with FEN/SAN handling, legal move generation, perft validation, engine
-  analysis, dataset export, and chess rendering workflows.
-- `https://github.com/LenniAConrad/chess-web` is a separate TypeScript web
-  chess player/trainer with puzzle play, server-side validation, and browser UI
-  experience.
+- `https://github.com/LenniAConrad/chess-rtk`: Java chess research toolkit with
+  move generation, notation, evaluation, engine/search, datasets, and
+  visualization concepts.
+- `https://github.com/LenniAConrad/chess-web`: TypeScript chess player/trainer
+  with browser UI and gameplay workflows.
 
-The C++ submission does not call either repository at runtime. Ideas and some
-algorithms were manually translated or redesigned into C++17 classes, headers,
-tests, and raylib rendering code.
+The C++ application does not call either repository at runtime.
 
-## 4. Requirements analysis
+## 4. Course Requirement Mapping
 
-| Requirement from course PDF | Project evidence |
+| Requirement | Project evidence |
 | --- | --- |
-| Classes | `Position`, `Game`, `MoveHistory`, `Tensor`, `ActivationSnapshot`, `App`, `BoardView`, network classes, loader classes, and view classes. |
-| File I/O | `Config::load/save`, FEN save/load through `FenIo`, binary model reading through `WeightFileReader`, PGN export helpers, tutorial/demo evidence. |
-| Multi-file `.h`/`.cpp` structure | `src/chess`, `src/game`, `src/nn`, `src/io`, and `src/viz` are split into headers and implementation files. |
-| Inheritance and polymorphism | `INetwork` is the abstract base for NNUE/CNN/BT4 networks; `IActivationView` is the abstract base for visual panels. |
-| Arrays and containers | Fixed arrays for board/bitboards/move list; STL vectors/maps/unordered maps for history, activation snapshots, config, and tensors. |
-| Linked list | `MoveHistory` is a manually implemented doubly linked list for undo/redo and move-list rendering. |
-| Templates | `Tensor<T, Rank>` implements a generic rank-aware tensor container. |
-| C++ core implementation | Chess rules, NN forward paths, tensor ops, loaders, UI coordination, and tests are implemented in C++17. |
+| Classes and encapsulation | `Position`, `Game`, `MoveHistory`, `Tensor`, `ActivationSnapshot`, `Nnue/Cnn/Bt4 Network`, `Mcts`, `App`, `BoardView`, activation views, editor widgets. |
+| Multi-file C++ structure | Separate `.h`/`.cpp` files under `src/chess`, `src/game`, `src/io`, `src/nn`, `src/search`, and `src/viz`. |
+| File I/O | `Config` load/save, FEN load/save, PGN export helpers, binary model readers, test reference data, Windows package config/assets/models. |
+| Inheritance/polymorphism | `INetwork` implemented by NNUE/CNN/BT4 networks; `IActivationView` implemented by NNUE/CNN/BT4/Classical views. |
+| Templates | `Tensor<T, Rank>` generic tensor container. |
+| Linked list | `MoveHistory` manually manages a doubly linked list of move records for undo/redo. |
+| Arrays/containers | Bitboards, fixed move arrays, mailbox board, STL vectors/maps/unordered maps for histories, tensors, snapshots, model weights, and search nodes. |
+| Chess game | Complete human-vs-human legal board with promotion, undo/redo, move history, FEN, and setup editor. |
+| Advanced feature | NN/evaluator activation visualizer plus native PUCT MCTS tree workbench. |
 | User manual | `docs/user-manual.md`. |
 | Design specification | `docs/design-spec.md` and `docs/class-diagram.png`. |
-| Test cases | `docs/test-cases.md`, `tests/*.cpp`, and the tutorial GIF/video under `docs/`. |
-| Summary report and AI usage | `docs/summary-report.md` and `docs/ai-usage.md`. |
+| Test cases | `docs/test-cases.md`, `tests/*.cpp`, and screenshots under `docs/screenshots/`. |
+| Summary report | `docs/summary-report.md`. |
+| AI usage | `docs/ai-usage.md`. |
+| Demo media | `docs/tutorial.gif`, `docs/demo.mp4`, and screenshot stills under `docs/screenshots/`. |
+| Packaged build | Linux build scripts and Windows x64 package under `dist/`. |
 
-## 5. Functional requirements
+## 5. Functional Requirements
 
-1. The user can play a legal chess game with mouse input, legal target
-   highlighting, promotion selection, undo/redo, and game-status reporting.
-2. The user can load and save positions through FEN text files and can create
-   custom legal positions in the setup editor.
-3. The visualizer can switch between NNUE, CNN, BT4, and disabled activation
-   views without changing the chess game state.
-4. The app displays board overlays and per-architecture panels that explain how
-   the current position moves through the selected neural-network structure.
-5. The project can be built and tested from the command line with CMake scripts.
+1. The user can play a legal chess game with mouse input.
+2. The board shows selected pieces, legal destinations, last move highlights,
+   promotion choices, and status text.
+3. The user can undo, redo, reset, flip, and play a random legal move.
+4. The user can load a complete FEN string and save the current FEN.
+5. The user can create custom legal positions in setup mode and cannot apply
+   invalid positions.
+6. The user can switch between NNUE, CNN, BT4, Classical, and Off activation
+   modes without changing the chess position.
+7. The visualizer displays meaningful architecture-specific data for each
+   evaluation path.
+8. The user can run and inspect a live search preview from the current
+   position.
+9. The user can open the MCTS tree workbench, run PUCT search, pan/zoom the
+   tree, filter it, scrub growth frames, and trace selected nodes.
+10. The project can be built, tested, documented, and packaged from command
+    line scripts.
 
-## 6. Non-functional requirements
+## 6. Non-Functional Requirements
 
-- The chess core is separated from raylib so it can be unit tested without a
-  graphics window.
-- Runtime code should not depend on Java, TypeScript, Python, or external chess
-  engines.
-- Source files should be modular, with low coupling between chess rules,
-  neural-network inference, file I/O, and visualization.
-- Manual tests and the tutorial walkthrough must state input restrictions clearly so the
-  final defense can reproduce the behavior.
+- The chess core must be independent of raylib.
+- CPU execution must be available without CUDA.
+- Runtime code must not depend on Java, TypeScript, Python, external chess
+  engines, or online services.
+- Compact runtime model files should keep the demo portable.
+- The UI should remain responsive while model evaluation and search run.
+- The documentation should match the current source, config, and model files.
+- The test suite should be runnable from a clean command line build.
 
-## 7. Acceptance plan
+## 7. Acceptance Plan
 
-Before final submission:
+Before submission or defense:
 
-1. Run `./scripts/test.sh` and keep the result in `docs/test-cases.md`.
-2. Build and launch the app from a clean checkout.
-3. Record a tutorial demo showing play, all command buttons, FEN load/save,
-   editor validation, architecture switching, detailed and abstract activation
-   views, and the native search preview.
-4. Export the required Markdown documents to PDF with `./scripts/export_docs.sh`
-   if the course platform prefers PDF files.
+1. Run `./scripts/test.sh`.
+2. Run `./build/tests/cnnv_tests` if an explicit individual-test count is
+   needed.
+3. Run `./scripts/demo_check.sh`.
+4. Launch the app with `./scripts/run.sh`.
+5. Demonstrate board play, undo/redo, FEN load/save, setup validation,
+   architecture switching, search preview, and MCTS tree view.
+6. Regenerate PDFs with `./scripts/export_docs.sh` when Markdown documents are
+   changed.
+7. Rebuild the Windows package when source, assets, config, or model defaults
+   change.

@@ -48,6 +48,35 @@ void tanh_act(const float* in, float* out, std::size_t n) {
     }
 }
 
+namespace {
+
+// Numerically stable softplus matching LC0/BT4's Java reference: for large x
+// it returns x, for very negative x it returns exp(x), and log1p(exp(x))
+// otherwise. The thresholds guard exp() from overflow/underflow.
+float softplus(float x) {
+    if (x > 20.0f) return x;
+    if (x < -20.0f) return std::exp(x);
+    return std::log1p(std::exp(x));
+}
+
+}  // namespace
+
+float mish(float x) {
+    return x * std::tanh(softplus(x));
+}
+
+float swish(float x) {
+    return x / (1.0f + std::exp(-x));
+}
+
+void mish(float* x, std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i) x[i] = mish(x[i]);
+}
+
+void swish(float* x, std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i) x[i] = swish(x[i]);
+}
+
 void gelu(const float* in, float* out, std::size_t n) {
     constexpr float kSqrt2OverPi = 0.7978845608028654f;
     constexpr float kCoef = 0.044715f;

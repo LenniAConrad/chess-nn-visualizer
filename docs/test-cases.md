@@ -1,155 +1,43 @@
 # Test Cases
 
-## 1. Automated tests
+## 1. Latest Automated Result
 
-### 1.1 Chess core (perft, FEN round-trip, SAN round-trip)
+Run date: 2026-06-08
 
-Command:
+Commands:
 
 ```sh
 ./scripts/test.sh
+./build/tests/cnnv_tests
 ```
 
-Latest automated run:
+Result:
 
 ```text
-Date: 2026-05-10
-Result: PASS
-ctest: 1/1 test passed, 0 failed
-Local test time: under 1 second
+ctest: 1/1 passed, 0 failed
+cnnv_tests: 151 passed, 0 failed (151 total)
 ```
 
-Coverage:
+The CTest target builds the project and runs the headless `cnnv_tests` binary.
+The direct `cnnv_tests` run is used to record the full individual-test count.
 
-- `PerftTest.cpp` checks legal move generation against known perft counts.
-- `FenTest.cpp` and `FenIoTest.cpp` check parsing, formatting, and text-file
-  save/load.
-- `SanTest.cpp` checks SAN conversion and disambiguation.
-- `PositionTest.cpp`, `MoveTest.cpp`, `PieceTest.cpp`, `BitboardTest.cpp`, and
-  `SlidingAttacksTest.cpp` check board state, encoding, attacks, and helpers.
+## 2. Automated Coverage
 
-### 1.2 Game-loop tests
-
-`GameLoopTest.cpp`, `MoveHistoryTest.cpp`, `MoveListTest.cpp`, and
-`EditorValidationTest.cpp` cover legal move application, undo/redo behavior,
-linked-list history, move-list storage, and setup-editor validation.
-
-### 1.3 Tensor-op tests
-
-`TensorOpsTest.cpp` covers the reusable tensor and operation layer used by the
-network implementations.
-
-### 1.4 NNUE numerical-match tests
-
-`NnueTest.cpp`, `NnueReferenceTest.cpp`, and `tests/data/nnue_ref.jsonl` verify
-NNUE feature encoding, accumulator/output behavior, and reference numerical
-matches.
-
-### 1.5 LC0 CNN numerical-match tests
-
-`Lc0CnnTest.cpp` checks board-plane encoding, convolutional network loading,
-and CNN forward-pass behavior.
-
-### 1.6 LC0 BT4 numerical-match tests
-
-`Bt4Test.cpp` checks the BT4-style token transformer path and snapshot keys.
-
-## 2. Manual UI tests
-
-### 2.1 Single-board play smoke test
-
-Date: 2026-05-08
-
-Environment: Linux/X11, default windowed application window.
-
-Kiwipete FEN used:
-
-```text
-r3k2r/p1ppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
-```
-
-Result: PASS
-
-| Step | Action | Expected result | Evidence |
-| --- | --- | --- | --- |
-| 1 | Launch the app. | Start position appears with White to move. | Covered in [`tutorial.gif`](tutorial.gif) and [`demo.mp4`](demo.mp4). |
-| 2 | Play 10 mouse moves: `1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Nf3 Nf6 5. Bc4 e6`. | Board, status, and move history update after each legal move. | Covered in the gameplay segment of the tutorial. |
-| 3 | Press Undo and Redo. | Board rewinds and replays through the linked-list move history. | Covered in the Undo/Redo segment of the tutorial. |
-| 4 | Open Load FEN and type Kiwipete. | Dialog accepts the full FEN text. | Covered in the Load FEN segment of the tutorial. |
-| 5 | Press Enter to load Kiwipete. | Kiwipete appears on the board with White to move. | Covered in the Kiwipete segment of the tutorial. |
-| 6 | Press Flip. | Board orientation reverses while the position stays unchanged. | Covered in the Flip segment of the tutorial. |
-| 7 | Press Save FEN. | `position.fen` is written with the Kiwipete FEN. | Covered in the Save FEN segment of the tutorial. |
-| 8 | Press Random. | One legal random move is played and the activation view updates. | Covered in the Random segment of the tutorial. |
-| 9 | Press Search. | Native engine-style search starts, shows depth/nodes/evaluation/PV, and can be stopped. | Covered in the Search segment of the tutorial. |
-
-Saved file verification:
-
-```text
-r3k2r/p1ppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
-```
-
-### 2.2 Board-editor flow
-
-Date: 2026-05-08
-
-Environment: Linux/X11, default windowed application window.
-
-Result: PASS
-
-| Step | Action | Expected result | Evidence |
-| --- | --- | --- | --- |
-| 1 | Enter Setup, then click Clear. | Board is empty and validation reports the missing kings. | Covered in the Setup editor segment of the tutorial. |
-| 2 | Place White king on e1, White queen on d1, Black king on h8, with White to move, then Validate. | Editor reports `Position is legal.` and Apply is enabled. | Covered in the Validate/Apply segment of the tutorial. |
-| 3 | Click Apply. | App returns to play mode from the edited K+Q vs. K position. | Covered in the Apply segment of the tutorial. |
-| 4 | Enter Setup again, place a second White king on a2, then Validate. | Editor rejects the position with a clear two-kings error and disables Apply. | Covered in the invalid-editor-validation segment of the tutorial. |
-
-### 2.3 Multi-architecture demonstration
-
-Date: 2026-05-09
-
-Environment: Linux/X11, default windowed application window.
-
-Result: PASS when all three architecture buttons can be selected without
-changing the legal chess position.
-
-| Step | Action | Expected result |
+| Area | Test files | What is covered |
 | --- | --- | --- |
-| 1 | Start the app and play at least one legal move. | Board, move history, and status update. |
-| 2 | Launch with `startup.arch=off`, then select NNUE and use abstract mode. | NNUE panel shows the HalfKP feature-to-accumulator-to-value flow. |
-| 3 | Switch NNUE to detailed mode. | NNUE panel shows node/layer details, accumulator ranges, clipped activations, and centipawn value. |
-| 4 | Select CNN and use abstract mode. | CNN panel shows input planes, residual trunk, policy head, and WDL/value head as a high-level flow. |
-| 5 | Switch CNN to detailed mode. | CNN panel shows heatmaps, selected tensor statistics, policy/value outputs, or a clear missing-weights status. |
-| 6 | Select BT4 and use abstract mode. | BT4 panel shows the token, embedding, transformer, policy, and value flow. |
-| 7 | Switch BT4 to detailed mode. | BT4 panel shows square tokens, attention-style maps, policy logits, and WDL/value summaries. |
-| 8 | Press Search with the active architecture selected. | The native search preview uses the selected architecture's evaluation path when possible and shows live depth, nodes, evaluation, and principal variation. |
-| 9 | Select OFF. | Activation panel is disabled while the chess board remains playable. |
+| Bitboards and attacks | `BitboardTest.cpp`, `SlidingAttacksTest.cpp` | square indices, masks, popcount/lsb, bishop/rook/knight/king/pawn attacks. |
+| Pieces, moves, move lists | `PieceTest.cpp`, `MoveTest.cpp`, `MoveListTest.cpp` | FEN chars, piece values, packed move encoding, UCI parsing, fixed move-list behavior. |
+| Position rules | `PositionTest.cpp`, `PerftTest.cpp`, `SmokeTest.cpp` | start position, make/unmake, castling, en-passant, promotion, check, draw helpers, known perft positions. |
+| Notation and file I/O | `FenTest.cpp`, `FenIoTest.cpp`, `SanTest.cpp`, `ConfigIoTest.cpp` | FEN parse/format, FEN files, SAN conversion, config parsing and saving. |
+| Game workflow | `GameLoopTest.cpp`, `MoveHistoryTest.cpp`, `EditorValidationTest.cpp` | legal move application, undo/redo linked list, PGN export, setup validation. |
+| Tensor operations | `TensorOpsTest.cpp` | tensor allocation, matmul, convolution, activations, softmax, layer norm, batch norm, attention, snapshots. |
+| NNUE | `NnueTest.cpp`, `NnueReferenceTest.cpp` | HalfKP feature encoding, loader validation, accumulator behavior, snapshot keys, CRTK reference values. |
+| LC0 CNN | `Lc0CnnTest.cpp`, `PolicyEncoderTest.cpp` | 112-plane encoder, LC0J loader, generated runtime model, policy move mapping, WDL/value output. |
+| LC0 BT4 | `Bt4Test.cpp` | BT4V metadata, synthetic fallback, BT4J loader guards, generated runtime BT4J model, attention/WDL snapshots. |
+| Classical evaluator | `ClassicalTest.cpp` | term symmetry, material, WDL normalization, insufficient material, PST tables, occupied-square heatmap. |
+| MCTS | `MctsTest.cpp` | PUCT growth, best move/PV extraction, mate-in-one, snapshot cap, frontier filtering, Q perspective/signatures. |
 
-## 3. Demo screen recording
-
-Animated tutorial: [`docs/tutorial.gif`](tutorial.gif), generated 2026-05-09.
-Video source: [`docs/demo.mp4`](demo.mp4), duration 104.57 seconds at
-2560x1550 from the app window used for the recording. The GIF is 1280x775 at
-12 FPS with 1255 frames. The current submitted configuration launches windowed
-by default, while `F11` still toggles borderless fullscreen for demonstrations.
-The media was regenerated from a fresh live capture, not from saved still-image
-files.
-
-The demo walkthrough shows:
-
-1. Launch in OFF mode, then Reset and Flip.
-2. NNUE abstract and detailed views, legal chess play, undo/redo, and move
-   history.
-3. Random, Load FEN, Save FEN, and native search.
-4. Native engine-style search with live depth, node count, evaluation, and PV.
-5. CNN abstract and detailed views.
-6. BT4 abstract and detailed views.
-7. OFF mode with the chess board still playable.
-8. Setup editor buttons: Clear, Startpos, palette placement, Eraser, side to
-   move, castling rights, en-passant, halfmove/fullmove counters, Validate,
-   Apply, and Cancel.
-9. Edit FEN flow with validation and applying a custom legal position.
-
-## 4. Final defense readiness check
+## 3. Readiness Check
 
 Command:
 
@@ -157,7 +45,118 @@ Command:
 ./scripts/demo_check.sh
 ```
 
-Expected result: the script reports that all required PDFs, tutorial media,
-runtime model files, windowed/OFF startup settings, media metadata, and
-automated tests are present. If a model file is missing, run
-`./scripts/import_models.sh` and re-run the check before the live demo.
+Expected result:
+
+- required project PDF exists,
+- tutorial GIF and MP4 exist,
+- screenshot evidence exists under `docs/screenshots/`,
+- Markdown documents have PDF exports under `docs/pdf/`,
+- runtime NNUE/CNN/BT4 model files exist,
+- key startup config values are checked,
+- media metadata is reported when `ffprobe` is installed,
+- `./scripts/test.sh` passes.
+
+If a model file is missing, run `./scripts/import_models.sh` and retry.
+
+## 4. Manual UI Smoke Tests
+
+These tests are intended for the live raylib window. They should be repeated
+after layout, input, rendering, or model-view changes.
+
+### 4.1 Launch And Board Play
+
+| Step | Action | Expected result |
+| --- | --- | --- |
+| 1 | Start the app with `./scripts/run.sh`. | Window opens at the configured size, start position is visible, and CNN is selected by default. |
+| 2 | Play `1. e4 d5 2. exd5 Qxd5 3. Nc3`. | Moves are legal, pieces animate through click/drag input, status and SAN move list update. |
+| 3 | Press `Ctrl+Z` twice, then `Ctrl+Y`. | Board rewinds and replays through the linked-list history. |
+| 4 | Click Flip or press `F`. | Orientation changes without changing the FEN. |
+| 5 | Click Random. | One legal random move is made if the game is ongoing. |
+| 6 | Press `Esc` after selecting a piece. | Selection and legal-target highlights clear. |
+
+### 4.2 FEN Workflow
+
+Kiwipete FEN:
+
+```text
+r3k2r/p1ppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
+```
+
+| Step | Action | Expected result |
+| --- | --- | --- |
+| 1 | Click Load FEN or press `L`. | FEN dialog opens. |
+| 2 | Paste Kiwipete and press Enter. | Position loads and is White to move. |
+| 3 | Click Save FEN or press `S`. | `position.fen` is written with the current position. |
+| 4 | Open Load FEN and type invalid text. | Dialog stays open and displays an error. |
+| 5 | Click Edit FEN from a legal position. | Current FEN opens for editing and then enters setup mode when applied. |
+
+### 4.3 Setup Editor
+
+| Step | Action | Expected result |
+| --- | --- | --- |
+| 1 | Click Setup or press `T`. | Editor palette and validation panel appear. |
+| 2 | Click Clear and Validate. | Validation reports missing kings; Apply is disabled. |
+| 3 | Place White king e1, White queen d1, Black king h8; set White to move; Validate. | Validation reports legal; Apply is enabled. |
+| 4 | Click Apply. | App returns to board mode with the edited position. |
+| 5 | Re-enter Setup and place a second White king. | Validation rejects the position. |
+| 6 | Press `Esc`. | Editor exits without committing further changes. |
+
+### 4.4 Activation Views
+
+| Step | Action | Expected result |
+| --- | --- | --- |
+| 1 | Select NNUE. | NNUE panel shows active features, accumulators, clipped values, output contribution, and centipawn value. |
+| 2 | Use the NNUE internal mode selector. | Overview, Trace, All, Atlas, and Diagram modes render without overlapping the panel. |
+| 3 | Select CNN. | CNN panel loads the compact LC0J model and shows input/trunk/policy/value information. |
+| 4 | Select BT4. | BT4 lazily loads the compact BT4J model and shows token/attention/policy/WDL data. |
+| 5 | In BT4 Trace/Atlas, inspect the attention board. | Board squares include pieces from the current position. |
+| 6 | Select Classical. | Term breakdown, WDL, phase, and piece-square heatmaps render. |
+| 7 | Select Off. | Activation panel hides and chess play still works. |
+| 8 | Mouse-wheel over an activation panel, right-drag, then press `0`. | Panel zooms, pans, and resets its camera. |
+
+### 4.5 Search Preview
+
+| Step | Action | Expected result |
+| --- | --- | --- |
+| 1 | Select CNN and click Search or press `E`. | Search starts, Search button switches to its active color, and depth/nodes/evaluation/PV update. |
+| 2 | Press `Esc` or click Search again. | Search stops and the button returns to inactive color. |
+| 3 | Start Search, then make or load a different move/position. | Search is stopped before stale output is applied. |
+| 4 | Repeat with NNUE, BT4, Classical, and Off. | Each architecture uses its documented evaluation/fallback path without crashing. |
+
+### 4.6 MCTS Tree Workbench
+
+| Step | Action | Expected result |
+| --- | --- | --- |
+| 1 | Press `G` or click Tree. | Full-window tree screen opens. |
+| 2 | Click Start. | PUCT search starts and mini-board nodes grow live. |
+| 3 | Use Fit, wheel zoom, and left-drag. | Tree can be framed, zoomed, and panned. |
+| 4 | Change visits, cpuct, branches, depth, Batch, Guides, and Merge. | Tree redraws with the selected controls. |
+| 5 | Click a node. | Selected node FEN is shown and traced into activation views after returning. |
+| 6 | Toggle Follow while search runs. | Current explored leaf is traced into activation views. |
+| 7 | Use Space, Left, Right, Home, and End. | Growth-frame scrubber plays and steps through recorded snapshots. |
+| 8 | Press `Esc` or `G`. | Tree closes and the main board returns. |
+
+## 5. Tutorial Media
+
+The recorded tutorial files are:
+
+- [`docs/tutorial.gif`](tutorial.gif)
+- [`docs/demo.mp4`](demo.mp4)
+
+They demonstrate board play, undo/redo, FEN load/save, setup editing,
+architecture switching, and search/tree workflows. If the UI changes
+substantially, regenerate the media before final submission.
+
+## 6. Screenshot Evidence
+
+The following still images are extracted from the final screen recording and
+are included so the test-case report has direct visual evidence for the main
+game workflows.
+
+| Screenshot | Demonstrated workflow |
+| --- | --- |
+| ![CNN board view](screenshots/01-cnn-board.png) | Startup board, local CNN model panel, policy/value visualizations, and default window layout. |
+| ![Search preview](screenshots/02-search-preview.png) | Legal moves, move history, active Search button state, and live search preview output. |
+| ![Classical evaluator](screenshots/03-classical-evaluator.png) | Handcrafted evaluator term breakdown and Classical visualization mode. |
+| ![NNUE panel](screenshots/04-nnue-panel.png) | NNUE feature/accumulator view and board overlay. |
+| ![MCTS tree](screenshots/05-mcts-tree.png) | Full-window PUCT tree workbench with mini-board nodes and controls. |

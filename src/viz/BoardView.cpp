@@ -16,6 +16,7 @@ constexpr float kCoordLeftMargin = 30.0f;
 constexpr float kCoordRightMargin = 8.0f;
 constexpr float kCoordTopMargin = 8.0f;
 constexpr float kCoordBottomMargin = 34.0f;
+constexpr float kActivationOverlayMaxOpacity = 0.62f;
 
 float clamp01(float x) {
     return std::max(0.0f, std::min(1.0f, x));
@@ -171,6 +172,7 @@ void BoardView::draw(const Theme& theme) const {
     // ----- activation overlay (under pieces) -----
     auto drawActivationOverlay = [&](const std::array<float, 64>& overlay,
                                      float opacity) {
+        opacity = clamp01(opacity) * kActivationOverlayMaxOpacity;
         if (opacity <= 0.001f) return;
         for (int idx = 0; idx < 64; ++idx) {
             float t = clamp01(overlay[static_cast<std::size_t>(idx)]);

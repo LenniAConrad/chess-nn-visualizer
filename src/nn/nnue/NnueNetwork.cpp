@@ -143,6 +143,50 @@ void Network::evaluate(const chess::Position& pos,
                   snapshot_keys::kFeatureWeightsActiveWhite);
     storeFeatures(false, snapshot_keys::kFeatureActiveBlack,
                   snapshot_keys::kFeatureWeightsActiveBlack);
+
+    // Position-independent learned-weight atlas. Marginalises the king-square
+    // dimension out of the feature transformer so every (slot, piece-plane,
+    // board-square) cell becomes a king-averaged weight footprint. Mirrors
+    // chess-rtk Network.dumpFeatureAtlas (src/chess/nn/nnue/Network.java:317).
+    {
+        constexpr int planes = FeatureEncoder::kPiecePlanes;  // 10
+        constexpr int squares = FeatureEncoder::kSquares;     // 64
+        const std::size_t span = static_cast<std::size_t>(planes) *
+                                 static_cast<std::size_t>(squares);
+        const float inv = 1.0f / static_cast<float>(squares);
+        std::vector<float> atlas(H * span, 0.0f);
+        std::vector<float> kingMap(H * static_cast<std::size_t>(squares), 0.0f);
+        std::vector<float> output(H, 0.0f);
+        for (int king = 0; king < squares; ++king) {
+            for (int plane = 0; plane < planes; ++plane) {
+                for (int sq = 0; sq < squares; ++sq) {
+                    const int feature =
+                        (king * planes + plane) * squares + sq;
+                    const std::size_t base =
+                        static_cast<std::size_t>(feature) * H;
+                    const std::size_t atlasBase =
+                        static_cast<std::size_t>(plane) *
+                            static_cast<std::size_t>(squares) +
+                        static_cast<std::size_t>(sq);
+                    for (std::size_t h = 0; h < H; ++h) {
+                        const float w = m_weights.featureWeights[base + h];
+                        atlas[h * span + atlasBase] += w * inv;
+                        kingMap[h * static_cast<std::size_t>(squares) +
+                                static_cast<std::size_t>(king)] +=
+                            w * inv / static_cast<float>(planes);
+                    }
+                }
+            }
+        }
+        std::copy_n(m_weights.outputWeights.data(), H, output.data());
+        out.store(snapshot_keys::kAtlasWeights,
+                  {H, static_cast<std::size_t>(planes),
+                   static_cast<std::size_t>(squares)},
+                  atlas.data());
+        out.store(snapshot_keys::kAtlasKing,
+                  {H, static_cast<std::size_t>(squares)}, kingMap.data());
+        out.store(snapshot_keys::kAtlasOutput, {H}, output.data());
+    }
 }
 
 }  // namespace cnnv::nn::nnue

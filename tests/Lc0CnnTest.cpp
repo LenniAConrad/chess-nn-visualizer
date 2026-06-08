@@ -1,5 +1,6 @@
 #include "TestMain.h"
 
+#include "BinaryTestWriter.h"
 #include "chess/Fen.h"
 #include "chess/Position.h"
 #include "nn/ActivationSnapshot.h"
@@ -21,6 +22,8 @@ using namespace cnnv::nn::lc0_cnn;
 
 namespace {
 
+namespace bin = cnnv_test::bin;
+
 bool approx(float a, float b, float tol = 1e-4f) {
     return std::fabs(a - b) <= tol;
 }
@@ -32,35 +35,34 @@ std::string tempPath(const char* suffix) {
     return buf;
 }
 
-void writeU32(std::ofstream& os, std::uint32_t v) {
-    os.write(reinterpret_cast<const char*>(&v), sizeof(v));
-}
-void writeI32(std::ofstream& os, std::int32_t v) {
-    os.write(reinterpret_cast<const char*>(&v), sizeof(v));
-}
-void writeFloatArray(std::ofstream& os, const std::vector<float>& v) {
-    writeU32(os, static_cast<std::uint32_t>(v.size()));
-    if (!v.empty()) {
-        os.write(reinterpret_cast<const char*>(v.data()),
-                 static_cast<std::streamsize>(v.size() * sizeof(float)));
+std::string runtimeCnnPath() {
+    for (const char* path : {
+             "models/lc0-cnn-small-112p-4x32-policy4672-wdl3.bin",
+             "../models/lc0-cnn-small-112p-4x32-policy4672-wdl3.bin",
+             "../../models/lc0-cnn-small-112p-4x32-policy4672-wdl3.bin",
+         }) {
+        std::ifstream in(path, std::ios::binary);
+        if (in.good()) return path;
     }
+    return {};
 }
+
 void writeConv(std::ofstream& os, int outC, int inC, int kernel,
                const std::vector<float>& weights,
                const std::vector<float>& bias) {
-    writeU32(os, static_cast<std::uint32_t>(outC));
-    writeU32(os, static_cast<std::uint32_t>(inC));
-    writeU32(os, static_cast<std::uint32_t>(kernel));
-    writeFloatArray(os, weights);
-    writeFloatArray(os, bias);
+    bin::writeU32(os, static_cast<std::uint32_t>(outC));
+    bin::writeU32(os, static_cast<std::uint32_t>(inC));
+    bin::writeU32(os, static_cast<std::uint32_t>(kernel));
+    bin::writeFloatArrayU32(os, weights);
+    bin::writeFloatArrayU32(os, bias);
 }
 void writeDense(std::ofstream& os, int outDim, int inDim,
                 const std::vector<float>& weights,
                 const std::vector<float>& bias) {
-    writeU32(os, static_cast<std::uint32_t>(outDim));
-    writeU32(os, static_cast<std::uint32_t>(inDim));
-    writeFloatArray(os, weights);
-    writeFloatArray(os, bias);
+    bin::writeU32(os, static_cast<std::uint32_t>(outDim));
+    bin::writeU32(os, static_cast<std::uint32_t>(inDim));
+    bin::writeFloatArrayU32(os, weights);
+    bin::writeFloatArrayU32(os, bias);
 }
 
 // Builds a tiny zero-weight LC0J network with no residual blocks. Useful as
@@ -91,15 +93,15 @@ std::string writeZeroNetwork() {
     std::string path = tempPath("zero");
     std::ofstream os(path, std::ios::binary);
     os.write("LC0J", 4);
-    writeU32(os, 1);              // version
-    writeU32(os, Cin);            // inputChannels
-    writeU32(os, Ct);             // trunkChannels
-    writeU32(os, 0);              // residualBlocks
-    writeU32(os, Cp);             // policyChannels
-    writeU32(os, Cv);             // valueChannels
-    writeU32(os, Vh);             // valueHidden
-    writeU32(os, static_cast<std::uint32_t>(policyMap.size()));  // policyMapLength
-    writeU32(os, 3);              // wdlOutputs
+    bin::writeU32(os, 1);              // version
+    bin::writeU32(os, Cin);            // inputChannels
+    bin::writeU32(os, Ct);             // trunkChannels
+    bin::writeU32(os, 0);              // residualBlocks
+    bin::writeU32(os, Cp);             // policyChannels
+    bin::writeU32(os, Cv);             // valueChannels
+    bin::writeU32(os, Vh);             // valueHidden
+    bin::writeU32(os, static_cast<std::uint32_t>(policyMap.size()));  // policyMapLength
+    bin::writeU32(os, 3);              // wdlOutputs
 
     writeConv(os, Ct, Cin, K, stemW, stemB);
     writeConv(os, Ct, Ct, 1, polyStemW, polyStemB);
@@ -107,8 +109,8 @@ std::string writeZeroNetwork() {
     writeConv(os, Cv, Ct, 1, vConvW, vConvB);
     writeDense(os, Vh, Cv * 64, fc1W, fc1B);
     writeDense(os, 3, Vh, fc2W, fc2B);
-    writeU32(os, static_cast<std::uint32_t>(policyMap.size()));
-    for (int v : policyMap) writeI32(os, v);
+    bin::writeU32(os, static_cast<std::uint32_t>(policyMap.size()));
+    for (int v : policyMap) bin::writeI32(os, v);
     return path;
 }
 
@@ -263,4 +265,34 @@ TEST(lc0cnn_network_evaluate_zero_weights) {
     }
 
     std::remove(path.c_str());
+}
+
+TEST(lc0cnn_generated_runtime_model_loads_and_evaluates) {
+    const std::string path = runtimeCnnPath();
+    if (path.empty()) return;
+
+    Network net;
+    net.load(path);
+    CHECK(net.isLoaded());
+    CHECK_EQ(net.weights().inputChannels, Encoder::kPlanes);
+    CHECK_EQ(net.weights().trunkChannels, 32);
+    CHECK_EQ(net.weights().blocks.size(), static_cast<std::size_t>(4));
+    CHECK_EQ(net.weights().policyChannels, 73);
+    CHECK_EQ(net.weights().policyMap.size(), static_cast<std::size_t>(73 * 64));
+
+    Position pos;
+    pos.setStartpos();
+    cnnv::nn::ActivationSnapshot snap;
+    net.evaluate(pos, snap);
+
+    namespace keys = cnnv::nn::lc0_cnn::snapshot_keys;
+    CHECK_EQ(snap.size(keys::kPolicyLogits), static_cast<std::size_t>(73 * 64));
+    CHECK_EQ(snap.size(keys::kFinalActivation), static_cast<std::size_t>(64));
+    CHECK_EQ(snap.size(keys::kValueWdl), static_cast<std::size_t>(3));
+    CHECK_EQ(snap.size(keys::blockReluKey(3)), static_cast<std::size_t>(32 * 64));
+
+    const float* wdl = snap.data(keys::kValueWdl);
+    const float sum = wdl[0] + wdl[1] + wdl[2];
+    CHECK(std::isfinite(sum));
+    CHECK(std::fabs(sum - 1.0f) < 1e-4f);
 }

@@ -2,7 +2,26 @@
 
 /**
  * @file Bt4View.h
- * @brief Activation panel for BT4-style token-transformer snapshots.
+ * @brief Activation panel for the LC0 BT4 token-transformer.
+ *
+ * Transpiled from chess-rtk's Bt4View (Java/Swing) to C++/raylib. The view
+ * mirrors all five crtk modes behind a self-drawn 5-segment switcher:
+ *   - Overview (ABSTRACT): pipeline + per-block attn/ffn strip + WDL +
+ *     token-energy board + top-policy bars.
+ *   - Trace (DETAILED): block selector + 4x8 head grid of 8x8 received-energy
+ *     thumbnails + the selected head's 64x64 attention matrix + an on-board
+ *     two-triangle from/to overlay + a head readout.
+ *   - All (RAW): the dense block x head grid of 64x64 attention matrices
+ *     stacked over 8x8 mean-received energy, via sqrt-gamma heatmaps.
+ *   - Atlas (ATLAS): block x head focus fingerprint + selected-head/token board
+ *     footprints + the selected head's 64x64 attention matrix.
+ *   - Diagram (DIAGRAM): static architecture schematic.
+ *
+ * Boards are drawn with theme square colours; the trace attention board can
+ * overlay live-position pieces supplied by `App`. Token-square <-> board-square
+ * mapping is identity here.
+ * Head count is derived from each block's attention tensor rather than a
+ * compile-time constant.
  */
 
 #include "viz/IActivationView.h"
@@ -13,7 +32,13 @@
 #include <string>
 #include <vector>
 
+namespace cnnv::chess {
+class Position;
+}
+
 namespace cnnv::viz {
+
+class PieceSprites;
 
 /**
  * @brief Renders BT4 token, attention, FFN, policy, and value activations.
@@ -28,60 +53,56 @@ public:
     /** @brief Sets the panel bounds. */
     void setBounds(Rectangle r) override { m_bounds = r; }
 
+    /** @brief Provides the live board position for attention-board pieces. */
+    void setPosition(const cnnv::chess::Position* position) noexcept {
+        m_position = position;
+    }
+
+    /** @brief Provides piece sprites used by attention-board overlays. */
+    void setSprites(const PieceSprites* sprites) noexcept { m_sprites = sprites; }
+
     /** @brief Draws the panel. */
     void draw(const Theme& theme = defaultTheme()) const override;
 
     /** @brief Short architecture label. */
     std::string name() const override { return "BT4"; }
 
-    /**
-     * @brief Summary statistics and raw values for one displayed tensor.
-     */
-    struct LayerStat {
-        std::string name;
-        std::string shape;
-        std::vector<std::size_t> shapeDims;
-        float mean = 0.0f;
-        float rms = 0.0f;
-        float min = 0.0f;
-        float max = 0.0f;
-        std::vector<float> values;
-    };
-
-    /**
-     * @brief Per-transformer-block summary used by the overview mode.
-     */
-    struct BlockStat {
-        int index = 0;
-        float attentionFocus = 0.0f;
-        LayerStat attentionOut;
-        LayerStat ffn;
-        LayerStat output;
+private:
+    /** @brief One transformer block's cached attention + FFN tensors. */
+    struct Block {
+        std::vector<float> attention;  ///< [heads, 64, 64] post-softmax.
+        std::vector<float> ffn;        ///< [64, D] feed-forward output.
+        int heads = 0;                 ///< Derived from attention.size()/(64*64).
+        float attentionFocus = 0.0f;   ///< Mean attention magnitude (block strip).
+        float ffnRms = 0.0f;           ///< FFN RMS (block strip).
         bool have = false;
     };
 
-private:
     Rectangle m_bounds{0, 0, 0, 0};
-    LayerStat m_inputPlanes;
-    LayerStat m_tokenFeatures;
-    LayerStat m_embedding;
-    LayerStat m_finalTokens;
-    LayerStat m_policy;
-    LayerStat m_valueLogits;
-    std::vector<BlockStat> m_blocks;
-    std::vector<float> m_attention;
-    std::vector<float> m_tokenEnergy;
-    std::vector<float> m_valueSalience;
+    const cnnv::chess::Position* m_position = nullptr;
+    const PieceSprites* m_sprites = nullptr;
+
+    // Cached snapshot tensors.
+    std::vector<Block> m_blocks;
+    std::vector<float> m_inputPlanes;
+    std::vector<float> m_tokenFeatures;
+    std::vector<float> m_embedding;
+    std::vector<float> m_finalTokens;
+    std::vector<float> m_tokenEnergy;     ///< [64] final token rms.
+    std::vector<float> m_boardSalience;   ///< [64] positive board salience.
+    std::vector<float> m_policy;          ///< [1858] policy logits.
     std::array<float, 3> m_wdl{0.0f, 0.0f, 0.0f};
     float m_valueScalar = 0.0f;
-    bool m_hasOverview = false;
-    bool m_hasAttention = false;
-    bool m_hasTokenEnergy = false;
-    bool m_hasValueSalience = false;
-    bool m_hasPolicy = false;
+    bool m_hasData = false;
     bool m_hasWdl = false;
-    mutable bool m_detailed = false;
-    mutable int m_selectedLayer = -1;
+    bool m_hasPolicy = false;
+    bool m_hasTokenEnergy = false;
+
+    // Mutable selection cursors (the view is drawn from a const method).
+    mutable int m_mode = 0;            ///< 0=Overview 1=Trace 2=All 3=Atlas 4=Diagram.
+    mutable int m_selectedBlock = 0;   ///< 0..blocks-1.
+    mutable int m_selectedHead = 0;    ///< 0..heads-1.
+    mutable int m_selectedSquare = -1; ///< -1 = none, else 0..63.
 };
 
 }  // namespace cnnv::viz

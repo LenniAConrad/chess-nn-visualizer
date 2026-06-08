@@ -37,6 +37,15 @@ constexpr const char* kOutputContributionThem = "nnue.output_contribution.them";
 constexpr const char* kOutputAffine = "nnue.output_affine";
 constexpr const char* kPieceContributionWhite = "nnue.piece_contribution.white";
 constexpr const char* kPieceContributionBlack = "nnue.piece_contribution.black";
+
+// Position-independent learned-weight atlas (mirrors chess-rtk
+// Network.dumpFeatureAtlas). These three tensors expose the feature
+// transformer's per-(slot, piece-plane, board-square) footprint after
+// marginalising out the king-square dimension, so the visualization layer
+// can render the Wikipedia-style NNUE weight atlas.
+constexpr const char* kAtlasWeights = "nnue.atlas.weights";  // [hidden, 10, 64]
+constexpr const char* kAtlasKing    = "nnue.atlas.king";     // [hidden, 64]
+constexpr const char* kAtlasOutput  = "nnue.atlas.output";   // [hidden]
 }  // namespace snapshot_keys
 
 /**

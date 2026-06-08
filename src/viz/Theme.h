@@ -34,6 +34,19 @@ struct Theme {
     Color accentMagenta     = Color{189,  86, 122, 230};
     Color accentYellow      = Color{255, 209,  90, 235};
 
+    /**
+     * @brief Per-architecture signature colors.
+     *
+     * Each network view carries one distinct signature hue used for its chrome
+     * (header accent strip, active selector tab, mode-toggle active segment,
+     * selection rings) so the four algorithms are visually distinguishable.
+     * Signed-activation data keeps the semantic green/red diverging palette.
+     */
+    Color sigNnue           = Color{244, 168,  35, 255};  // amber
+    Color sigCnn            = Color{ 26, 169, 160, 255};  // teal
+    Color sigBt4            = Color{140,  92, 240, 255};  // violet
+    Color sigClassical      = Color{224,  82, 156, 255};  // rose
+
     /** @brief Selected-square highlight. */
     Color selection         = Color{255, 209,  90, 200};
 

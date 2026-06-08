@@ -7,8 +7,10 @@
 
 #include "nn/INetwork.h"
 #include "nn/lc0_cnn/Lc0CnnWeights.h"
+#include "chess/Move.h"
 
 #include <string>
+#include <vector>
 
 namespace cnnv::nn::lc0_cnn {
 
@@ -74,8 +76,23 @@ class Network : public INetwork {
      */
     const Weights& weights() const noexcept { return m_weights; }
 
+    /**
+     * @brief Index of a move in `cnn.policy.logits`, or -1 if not representable.
+     *
+     * Maps the move to its raw LC0 plane index (PolicyEncoder) and reverse-looks
+     * it up through the weight file's compressed policyMap. Used by the MCTS
+     * search to read real policy priors.
+     */
+    int policyIndexForMove(const cnnv::chess::Position& pos,
+                           cnnv::chess::Move move) const;
+
    private:
+    void ensurePolicyReverse() const;
+
     Weights m_weights;
+    // Lazily built reverse map: raw plane index -> compressed logit index.
+    mutable std::vector<int> m_policyReverse;
+    mutable bool m_policyReverseBuilt = false;
 };
 
 }  // namespace cnnv::nn::lc0_cnn
